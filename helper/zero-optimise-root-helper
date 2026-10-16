@@ -1,0 +1,59 @@
+#!/bin/bash
+# Zero-Optimise privileged system helper
+# Performs root-level memory drop_caches, compaction, and journal vacuuming.
+
+set -e
+
+ACTION="${1:-all}"
+
+echo "[Zero-Optimise Helper] Executing action: $ACTION"
+
+sync_and_drop_caches() {
+    echo "Syncing filesystems..."
+    sync
+    echo "Dropping pagecache, dentries, and inodes..."
+    if [ -w /proc/sys/vm/drop_caches ]; then
+        echo 3 > /proc/sys/vm/drop_caches
+    else
+        echo "Error: /proc/sys/vm/drop_caches not writable" >&2
+        exit 1
+    fi
+}
+
+compact_memory() {
+    echo "Compacting memory pages to alleviate kswapd0 thrashing..."
+    if [ -w /proc/sys/vm/compact_memory ]; then
+        echo 1 > /proc/sys/vm/compact_memory
+    fi
+}
+
+vacuum_journal() {
+    echo "Vacuuming systemd journal logs..."
+    if command -v journalctl >/dev/null 2>&1; then
+        journalctl --vacuum-time=3d --vacuum-size=100M >/dev/null 2>&1 || true
+    fi
+}
+
+case "$ACTION" in
+    drop_caches)
+        sync_and_drop_caches
+        ;;
+    compact)
+        compact_memory
+        ;;
+    journal)
+        vacuum_journal
+        ;;
+    all)
+        sync_and_drop_caches
+        compact_memory
+        vacuum_journal
+        ;;
+    *)
+        echo "Unknown action: $ACTION" >&2
+        exit 1
+        ;;
+esac
+
+echo "[Zero-Optimise Helper] Completed successfully."
+exit 0

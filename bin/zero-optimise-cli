@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Zero-Optimise CLI Launcher
+DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export PYTHONPATH="$DIR:$PYTHONPATH"
+exec python3 "$DIR/zero_optimise/cli.py" "$@"
