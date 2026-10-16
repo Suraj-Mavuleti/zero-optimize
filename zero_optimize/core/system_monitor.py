@@ -17,7 +17,7 @@ PROTECTED_COMM_NAMES = {
     "pipewire", "pipewire-pulse", "wireplumber", "dbus-daemon", "dbus-broker",
     "Xwayland", "sddm", "polkitd", "udevd", "systemd-journald",
     "systemd-udevd", "systemd-logind", "systemd-resolved", "kded6",
-    "ksmserver", "krunner", "zero-optimise"
+    "ksmserver", "krunner", "zero-optimize"
 }
 
 

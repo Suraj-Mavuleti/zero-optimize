@@ -1,12 +1,12 @@
 #!/bin/bash
-# Zero-Optimise privileged system helper
+# Zero-Optimize privileged system helper
 # Performs root-level memory drop_caches, compaction, and journal vacuuming.
 
 set -e
 
 ACTION="${1:-all}"
 
-echo "[Zero-Optimise Helper] Executing action: $ACTION"
+echo "[Zero-Optimize Helper] Executing action: $ACTION"
 
 sync_and_drop_caches() {
     echo "Syncing filesystems..."
@@ -55,5 +55,5 @@ case "$ACTION" in
         ;;
 esac
 
-echo "[Zero-Optimise Helper] Completed successfully."
+echo "[Zero-Optimize Helper] Completed successfully."
 exit 0

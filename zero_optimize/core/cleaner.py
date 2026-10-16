@@ -1,5 +1,5 @@
 """
-Zero-Optimise Memory & Cache Cleaner Module.
+Zero-Optimize Memory & Cache Cleaner Module.
 Handles userspace cache clearing, stale worker termination, and privileged system memory drops.
 """
 
@@ -8,7 +8,7 @@ import shutil
 import signal
 import subprocess
 from typing import Dict, List, Any, Tuple
-from zero_optimise.core.system_monitor import PROTECTED_COMM_NAMES
+from zero_optimize.core.system_monitor import PROTECTED_COMM_NAMES
 
 
 class Cleaner:
@@ -16,7 +16,7 @@ class Cleaner:
         if helper_path is None:
             # Look in standard helper directory
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            self.helper_path = os.path.join(base_dir, "helper", "zero-optimise-root-helper")
+            self.helper_path = os.path.join(base_dir, "helper", "zero-optimize-root-helper")
         else:
             self.helper_path = helper_path
 

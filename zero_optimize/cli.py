@@ -1,15 +1,15 @@
 """
-Zero-Optimise Command Line Interface.
+Zero-Optimize Command Line Interface.
 Provides terminal access to status, memory cleanup, CPU optimization, and background guard.
 """
 
 import sys
 import time
 import argparse
-from zero_optimise.core.system_monitor import SystemMonitor
-from zero_optimise.core.optimizer import Optimizer
-from zero_optimise.core.cleaner import Cleaner
-from zero_optimise.core.autoguard import AutoGuard
+from zero_optimize.core.system_monitor import SystemMonitor
+from zero_optimize.core.optimizer import Optimizer
+from zero_optimize.core.cleaner import Cleaner
+from zero_optimize.core.autoguard import AutoGuard
 
 # ANSI color codes
 CYAN = "\033[96m"
@@ -23,7 +23,7 @@ RESET = "\033[0m"
 def print_banner():
     print(f"""{CYAN}{BOLD}
     ╔═══════════════════════════════════════════════════════════╗
-    ║       ⚡ ZERO-OPTIMISE (Garuda RAM & CPU Booster) ⚡        ║
+    ║       ⚡ ZERO-OPTIMIZE (Garuda RAM & CPU Booster) ⚡        ║
     ╚═══════════════════════════════════════════════════════════╝{RESET}""")
 
 
@@ -85,8 +85,9 @@ def cmd_boost(optimizer: Optimizer, root_cache_drop: bool = False):
 
 def cmd_guard(optimizer: Optimizer):
     print_banner()
-    print(f"{CYAN}🛡️  Starting Zero-Optimise AutoGuard daemon (Press Ctrl+C to stop)...{RESET}")
-    guard = AutoGuard(optimizer, ram_threshold=82.0, cpu_threshold=70.0, interval_seconds=3.0)
+    print(f"{CYAN}🛡️  Starting Zero-Optimize AutoGuard daemon (Continuous 1-second Loop)...{RESET}")
+    guard = AutoGuard(optimizer, ram_threshold=82.0, interval_seconds=1.0)
+
 
     def on_event(ev):
         ev_type = ev.get("type")
@@ -107,7 +108,7 @@ def cmd_guard(optimizer: Optimizer):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Zero-Optimise: Linux RAM & CPU Optimizer for Garuda Linux")
+    parser = argparse.ArgumentParser(description="Zero-Optimize: Linux RAM & CPU Optimizer for Garuda Linux")
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
     subparsers.add_parser("status", help="Show current RAM, Swap, CPU and top processes")

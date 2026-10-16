@@ -1,5 +1,5 @@
 """
-Zero-Optimise System Optimizer Engine.
+Zero-Optimize System Optimizer Engine.
 Intelligently optimizes CPU scheduling, memory footprints, and manages background processes.
 """
 
@@ -7,8 +7,8 @@ import os
 import signal
 import subprocess
 from typing import Dict, List, Any, Tuple
-from zero_optimise.core.system_monitor import SystemMonitor, PROTECTED_COMM_NAMES
-from zero_optimise.core.cleaner import Cleaner
+from zero_optimize.core.system_monitor import SystemMonitor, PROTECTED_COMM_NAMES
+from zero_optimize.core.cleaner import Cleaner
 
 
 class Optimizer:

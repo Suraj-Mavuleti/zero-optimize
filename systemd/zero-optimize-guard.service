@@ -1,10 +1,10 @@
 [Unit]
-Description=Zero-Optimise Background Performance & RAM Guard
+Description=Zero-Optimize Background Performance & RAM Guard
 After=default.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/zero-optimise-cli guard
+ExecStart=%h/.local/bin/zero-optimize-cli guard
 Restart=on-failure
 RestartSec=5s
 Nice=19

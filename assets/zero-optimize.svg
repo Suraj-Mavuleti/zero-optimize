@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <defs>
+    <linearGradient id="neonGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f0ff"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="orangeGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffedd5"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dev Zero Standard 108x108 Squircle -->
+  <rect width="108" height="108" rx="24" fill="#000000"/>
+
+  <!-- Zero-Optimize Precision Geometric Symbol -->
+  <!-- Outer Zero Ring: Clean high-tech split ellipse -->
+  <path d="M54 22 C34 22 22 36 22 54 C22 72 34 86 54 86 C74 86 86 72 86 54 C86 36 74 22 54 22 Z M54 30 C69 30 78 41 78 54 C78 67 69 78 54 78 C39 78 30 67 30 54 C30 41 39 30 54 30 Z" fill="#FFFFFF" fill-opacity="0.95"/>
+
+  <!-- Center Speed Core / Supersonic Chevron Bolt -->
+  <polygon points="56,36 44,56 53,56 49,72 65,51 55,51" fill="#FFFFFF"/>
+  <polygon points="56,38 46,55 54,55 51,68 63,52 55,52" fill="url(#orangeGlow)"/>
+
+  <!-- Precision Accent Speed Dots -->
+  <circle cx="54" cy="26" r="2" fill="#f97316"/>
+  <circle cx="54" cy="82" r="2" fill="#00f0ff"/>
+</svg>

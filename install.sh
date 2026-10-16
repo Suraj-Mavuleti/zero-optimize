@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Zero-Optimise Installer for Garuda Linux / KDE Plasma
+# Zero-Optimize Installer for Garuda Linux / KDE Plasma
 set -e
 
 DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-echo "Installing Zero-Optimise from $DIR..."
+echo "Installing Zero-Optimize from $DIR..."
 
 # 1. Ensure directories exist
 mkdir -p "$HOME/.local/bin"
@@ -11,21 +11,21 @@ mkdir -p "$HOME/.local/share/applications"
 mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps"
 
 # 2. Symlink/copy executables into ~/.local/bin
-ln -sf "$DIR/bin/zero-optimise" "$HOME/.local/bin/zero-optimise"
-ln -sf "$DIR/bin/zero-optimise-cli" "$HOME/.local/bin/zero-optimise-cli"
-chmod +x "$DIR/bin/zero-optimise" "$DIR/bin/zero-optimise-cli" "$DIR/helper/zero-optimise-root-helper"
+ln -sf "$DIR/bin/zero-optimize" "$HOME/.local/bin/zero-optimize"
+ln -sf "$DIR/bin/zero-optimize-cli" "$HOME/.local/bin/zero-optimize-cli"
+chmod +x "$DIR/bin/zero-optimize" "$DIR/bin/zero-optimize-cli" "$DIR/helper/zero-optimize-root-helper"
 
 # 3. Copy Icon
-cp "$DIR/assets/zero-optimise.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/zero-optimise.svg"
+cp "$DIR/assets/zero-optimize.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/zero-optimize.svg"
 
 # 4. Generate & Install Desktop Entry with absolute path
-cat > "$HOME/.local/share/applications/zero-optimise.desktop" <<EOF
+cat > "$HOME/.local/share/applications/zero-optimize.desktop" <<EOF
 [Desktop Entry]
-Name=Zero-Optimise
+Name=Zero-Optimize
 Comment=Garuda Linux RAM & CPU Booster
 GenericName=System Optimizer
-Exec=$HOME/.local/bin/zero-optimise
-Icon=$HOME/.local/share/icons/hicolor/scalable/apps/zero-optimise.svg
+Exec=$HOME/.local/bin/zero-optimize
+Icon=$HOME/.local/share/icons/hicolor/scalable/apps/zero-optimize.svg
 Terminal=false
 Type=Application
 Categories=System;Monitor;Utility;
@@ -33,11 +33,11 @@ Keywords=ram;cpu;optimize;boost;clean;memory;garuda;task;
 StartupNotify=true
 EOF
 
-chmod +x "$HOME/.local/share/applications/zero-optimise.desktop"
+chmod +x "$HOME/.local/share/applications/zero-optimize.desktop"
 
 # 5. Install systemd user service
 mkdir -p "$HOME/.config/systemd/user"
-cp "$DIR/systemd/zero-optimise-guard.service" "$HOME/.config/systemd/user/zero-optimise-guard.service"
+cp "$DIR/systemd/zero-optimize-guard.service" "$HOME/.config/systemd/user/zero-optimize-guard.service"
 systemctl --user daemon-reload 2>/dev/null || true
 
 # 6. Update desktop database
@@ -52,10 +52,10 @@ elif command -v kbuildsycoca5 >/dev/null 2>&1; then
 fi
 
 echo "=========================================================="
-echo "✨ Zero-Optimise successfully installed!"
-echo "• Launch GUI from app menu or terminal: zero-optimise"
-echo "• Launch CLI tool: zero-optimise-cli"
+echo "✨ Zero-Optimize successfully installed!"
+echo "• Launch GUI from app menu or terminal: zero-optimize"
+echo "• Launch CLI tool: zero-optimize-cli"
 echo "• Enable background auto-guard on boot (optional):"
-echo "  systemctl --user enable --now zero-optimise-guard"
+echo "  systemctl --user enable --now zero-optimize-guard"
 echo "=========================================================="
 

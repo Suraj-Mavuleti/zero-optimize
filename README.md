@@ -1,4 +1,4 @@
-# ⚡ Zero-Optimise — Garuda Linux RAM & CPU Booster
+# ⚡ Zero-Optimize — Garuda Linux RAM & CPU Booster
 
 A lightweight, high-performance system optimizer and watchdog specifically engineered for **Garuda Linux** (KDE Plasma Wayland/X11, Arch Linux). 
 
@@ -41,47 +41,47 @@ When Linux systems run for days or weeks without rebooting, several hidden bottl
   - Sleek Cyber/Neon dark theme matching Garuda Linux.
   - Minimizes to KDE Plasma system tray with live RAM/CPU tooltip.
 - **💻 Dual Interface (GUI + CLI)**:
-  - GUI: `zero-optimise` (searchable in Garuda Application Launcher).
-  - CLI: `zero-optimise-cli` for terminal lovers, SSH sessions, or cron scripts.
+  - GUI: `zero-optimize` (searchable in Garuda Application Launcher).
+  - CLI: `zero-optimize-cli` for terminal lovers, SSH sessions, or cron scripts.
 
 ---
 
 ## 📦 Installation & Quick Start
 
-Zero-Optimise is already installed in your user environment:
+Zero-Optimize is already installed in your user environment:
 
 ### Launch the Desktop App (GUI)
-- Open your **Garuda Application Launcher** (Application Menu) and search for **Zero-Optimise**.
+- Open your **Garuda Application Launcher** (Application Menu) and search for **Zero-Optimize**.
 - Or run in terminal:
   ```bash
-  zero-optimise
+  zero-optimize
   ```
 
 ### Use the Command-Line Interface (CLI)
 ```bash
 # Check current system status & top resource hogs
-zero-optimise-cli status
+zero-optimize-cli status
 
 # Run 1-Click Smart Boost
-zero-optimise-cli boost
+zero-optimize-cli boost
 
 # Run 1-Click Boost with root pagecache drop & memory compaction
-zero-optimise-cli boost --root
+zero-optimize-cli boost --root
 
 # Clean user thumbnail cache and journals
-zero-optimise-cli clean-cache
+zero-optimize-cli clean-cache
 
 # Drop system pagecache and compact memory via Polkit
-zero-optimise-cli drop-caches
+zero-optimize-cli drop-caches
 
 # Suspend a runaway background process (reduces to 0% CPU)
-zero-optimise-cli freeze <PID>
+zero-optimize-cli freeze <PID>
 
 # Resume a suspended process
-zero-optimise-cli thaw <PID>
+zero-optimize-cli thaw <PID>
 
 # Run Auto-Guard watchdog in terminal
-zero-optimise-cli guard
+zero-optimize-cli guard
 ```
 
 ---
@@ -89,11 +89,11 @@ zero-optimise-cli guard
 ## 🛠️ Project Structure
 
 ```
-zero-optimise/
+zero-optimize/
 ├── bin/
-│   ├── zero-optimise        # GUI executable wrapper
-│   └── zero-optimise-cli    # CLI executable wrapper
-├── zero_optimise/
+│   ├── zero-optimize        # GUI executable wrapper
+│   └── zero-optimize-cli    # CLI executable wrapper
+├── zero_optimize/
 │   ├── core/
 │   │   ├── system_monitor.py # Ultra-fast /proc reader (RAM, CPU, Swap, ZRAM)
 │   │   ├── cleaner.py        # Cache purger, kioworker cleaner, privileged drop
@@ -105,11 +105,11 @@ zero-optimise/
 │   │   └── styles.py         # Garuda dark neon cyber stylesheet
 │   └── cli.py                # Command-line interface
 ├── helper/
-│   └── zero-optimise-root-helper # Privileged helper for drop_caches & compaction
+│   └── zero-optimize-root-helper # Privileged helper for drop_caches & compaction
 ├── desktop/
-│   └── zero-optimise.desktop     # KDE Plasma application entry
+│   └── zero-optimize.desktop     # KDE Plasma application entry
 ├── assets/
-│   └── zero-optimise.svg         # High-resolution vector icon
+│   └── zero-optimize.svg         # High-resolution vector icon
 └── install.sh                    # Setup and application registration script
 ```
 

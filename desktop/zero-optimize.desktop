@@ -1,9 +1,9 @@
 [Desktop Entry]
-Name=Zero-Optimise
+Name=Zero-Optimize
 Comment=Garuda Linux RAM & CPU Booster
 GenericName=System Optimizer
-Exec=/home/suraj/.local/bin/zero-optimise
-Icon=zero-optimise
+Exec=/home/suraj/.local/bin/zero-optimize
+Icon=zero-optimize
 Terminal=false
 Type=Application
 Categories=System;Monitor;Utility;
