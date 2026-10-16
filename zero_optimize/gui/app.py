@@ -1,8 +1,10 @@
 """
-Zero-Optimize Main GUI Application.
-High-performance desktop application matching zero.skillissue.gg aesthetics.
-Features continuous 1-second autonomous background optimization, zero popups,
-automatic build worker cleanups, and GitHub release self-updating.
+Zero-Optimize Desktop Application.
+Modern minimalist desktop architecture modeled on ZeroMusic's desktop shell:
+- 240px native left sidebar (Dashboard, Processes, Cleaners, Daemon status)
+- Clean metric telemetry tiles with real-time gauges
+- Process management with individual kill, throttle, and freeze actions
+- Continuous 1.0s autonomous engine with zero annoying popups
 """
 
 import sys
@@ -12,7 +14,7 @@ from typing import Dict, Any, List
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem,
+    QLabel, QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QLineEdit, QComboBox, QTextEdit, QCheckBox,
     QSystemTrayIcon, QMenu, QFrame
 )
@@ -45,7 +47,8 @@ class ZeroOptimizeApp(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Zero-Optimize")
-        self.resize(920, 640)
+        self.resize(1020, 680)
+        self.setMinimumSize(880, 560)
         self.setStyleSheet(ZERO_THEME)
 
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -62,7 +65,6 @@ class ZeroOptimizeApp(QMainWindow):
         self.autoguard = AutoGuard(optimizer=self.optimizer, interval_seconds=1.0)
         self.updater = AutoUpdater()
 
-        # Process Caching
         self._cached_processes: List[Dict[str, Any]] = []
         self._last_table_populate: float = 0.0
 
@@ -80,123 +82,155 @@ class ZeroOptimizeApp(QMainWindow):
     def _setup_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(20, 18, 20, 18)
-        main_layout.setSpacing(14)
+        root_layout = QHBoxLayout(central_widget)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
-        # 1. Header Card (zero.skillissue.gg aesthetic - clean, no fake git score)
-        header_card = QFrame()
-        header_card.setObjectName("HeaderCard")
-        header_layout = QHBoxLayout(header_card)
-        header_layout.setContentsMargins(16, 12, 16, 12)
+        # ── 1. LEFT SIDEBAR (ZeroMusic Desktop Shell) ──
+        sidebar = QWidget()
+        sidebar.setObjectName("Sidebar")
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(16, 20, 16, 20)
+        sidebar_layout.setSpacing(6)
 
-        brand_left = QHBoxLayout()
-        brand_left.setSpacing(12)
-
+        # Brand Lockup
+        brand_box = QHBoxLayout()
+        brand_box.setSpacing(10)
         logo_lbl = QLabel()
         if os.path.exists(self.icon_path):
-            logo_lbl.setPixmap(QIcon(self.icon_path).pixmap(36, 36))
-        else:
-            logo_lbl.setText("⚡")
-            logo_lbl.setFont(QFont("Segoe UI Emoji", 20))
-        brand_left.addWidget(logo_lbl)
+            logo_lbl.setPixmap(QIcon(self.icon_path).pixmap(30, 30))
+        brand_box.addWidget(logo_lbl)
 
-        brand_text_box = QVBoxLayout()
-        brand_text_box.setSpacing(2)
+        brand_text_col = QVBoxLayout()
+        brand_text_col.setSpacing(0)
+        b_name = QLabel("Zero-Optimize")
+        b_name.setStyleSheet("font-size: 14px; font-weight: 700; color: #FFFFFF;")
+        b_sub = QLabel("by devzero")
+        b_sub.setStyleSheet("font-size: 11px; color: #52525B; font-family: 'JetBrains Mono', monospace;")
+        brand_text_col.addWidget(b_name)
+        brand_text_col.addWidget(b_sub)
+        brand_box.addLayout(brand_text_col)
+        brand_box.addStretch()
+        sidebar_layout.addLayout(brand_box)
+        sidebar_layout.addSpacing(16)
 
-        brand_row = QHBoxLayout()
-        brand_row.setSpacing(6)
-        brand_title = QLabel("devzero")
-        brand_title.setStyleSheet("font-weight: 700; font-size: 15px; color: #A1A1AA;")
-        brand_sep = QLabel("/")
-        brand_sep.setStyleSheet("color: #52525B; font-size: 14px; font-weight: bold;")
-        brand_sub = QLabel("zero-optimize")
-        brand_sub.setStyleSheet("font-weight: 800; font-size: 16px; color: #FFFFFF;")
-        version_badge = QLabel("v2.1.0")
-        version_badge.setStyleSheet("color: #71717A; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-left: 6px;")
+        # Navigation: Section 1
+        t1 = QLabel("DASHBOARD")
+        t1.setProperty("class", "SidebarBlockTitle")
+        sidebar_layout.addWidget(t1)
 
-        brand_row.addWidget(brand_title)
-        brand_row.addWidget(brand_sep)
-        brand_row.addWidget(brand_sub)
-        brand_row.addWidget(version_badge)
-        brand_row.addStretch()
-        brand_text_box.addLayout(brand_row)
+        self.btn_nav_overview = QPushButton("Overview")
+        self.btn_nav_overview.setProperty("class", "SidebarNavBtn")
+        self.btn_nav_overview.setProperty("active", "true")
+        self.btn_nav_overview.clicked.connect(lambda: self._switch_view(0))
+        sidebar_layout.addWidget(self.btn_nav_overview)
 
+        self.btn_nav_procs = QPushButton("Process Inspector")
+        self.btn_nav_procs.setProperty("class", "SidebarNavBtn")
+        self.btn_nav_procs.clicked.connect(lambda: self._switch_view(1))
+        sidebar_layout.addWidget(self.btn_nav_procs)
+
+        self.btn_nav_log = QPushButton("Real-Time Audit")
+        self.btn_nav_log.setProperty("class", "SidebarNavBtn")
+        self.btn_nav_log.clicked.connect(lambda: self._switch_view(2))
+        sidebar_layout.addWidget(self.btn_nav_log)
+
+        sidebar_layout.addSpacing(12)
+
+        # Navigation: Section 2
+        t2 = QLabel("AUTONOMOUS ENGINE")
+        t2.setProperty("class", "SidebarBlockTitle")
+        sidebar_layout.addWidget(t2)
+
+        self.engine_status_pill = QLabel("● Active (1.0s loop)")
+        self.engine_status_pill.setStyleSheet("""
+            color: #FB923C; font-size: 11px; font-family: 'JetBrains Mono', monospace;
+            padding: 6px 10px; background: rgba(249, 115, 22, 0.08); border-radius: 6px;
+        """)
+        sidebar_layout.addWidget(self.engine_status_pill)
+
+        sidebar_layout.addStretch()
+
+        # Bottom System Info
         uptime_sec = self.monitor.get_uptime_seconds()
         days = int(uptime_sec // 86400)
         hrs = int((uptime_sec % 86400) // 3600)
-        self.sub_info_lbl = QLabel(f"Garuda Linux (Wayland) • Uptime: {days}d {hrs}h • Kernel: {os.uname().release}")
-        self.sub_info_lbl.setStyleSheet("color: #71717A; font-size: 11px; font-family: 'JetBrains Mono', monospace;")
-        brand_text_box.addWidget(self.sub_info_lbl)
+        sys_lbl = QLabel(f"Garuda Wayland\nUptime: {days}d {hrs}h")
+        sys_lbl.setStyleSheet("color: #52525B; font-size: 11px; font-family: 'JetBrains Mono', monospace; line-height: 1.4;")
+        sidebar_layout.addWidget(sys_lbl)
 
-        brand_left.addLayout(brand_text_box)
-        header_layout.addLayout(brand_left)
-        header_layout.addStretch()
+        root_layout.addWidget(sidebar)
 
-        # Engine Badge & Auto-Update
-        engine_status_box = QHBoxLayout()
-        engine_status_box.setSpacing(10)
+        # ── 2. MAIN STAGE (Content Pages) ──
+        stage = QWidget()
+        stage.setObjectName("MainStage")
+        stage_layout = QVBoxLayout(stage)
+        stage_layout.setContentsMargins(28, 24, 28, 24)
+        stage_layout.setSpacing(20)
 
-        self.live_badge = QLabel("● AUTONOMOUS · 1.0s")
-        self.live_badge.setObjectName("LiveStatusBadge")
-        engine_status_box.addWidget(self.live_badge)
+        # Header Bar
+        stage_header = QHBoxLayout()
+        self.page_title_lbl = QLabel("Overview")
+        self.page_title_lbl.setStyleSheet("font-size: 22px; font-weight: 800; letter-spacing: -0.5px;")
+        stage_header.addWidget(self.page_title_lbl)
+        stage_header.addStretch()
 
-        self.btn_check_updates = QPushButton("Check Updates")
-        self.btn_check_updates.setStyleSheet("font-size: 11px; padding: 4px 10px; font-family: 'JetBrains Mono', monospace;")
-        self.btn_check_updates.clicked.connect(self._manual_check_update)
-        engine_status_box.addWidget(self.btn_check_updates)
+        self.btn_quick_boost = QPushButton("⚡ Instant Reclaim")
+        self.btn_quick_boost.setObjectName("PrimaryAction")
+        self.btn_quick_boost.clicked.connect(self._run_turbo_boost)
+        stage_header.addWidget(self.btn_quick_boost)
 
-        header_layout.addLayout(engine_status_box)
-        main_layout.addWidget(header_card)
+        self.btn_clean_daemons = QPushButton("Kill Build Daemons")
+        self.btn_clean_daemons.setProperty("class", "SecondaryAction")
+        self.btn_clean_daemons.clicked.connect(self._run_clean_workers)
+        stage_header.addWidget(self.btn_clean_daemons)
 
-        # 2. Key Metric Cards
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        stage_layout.addLayout(stage_header)
 
-        self.ram_card = StatCard("RAM Usage", "Active & Inactive Heap", bar_color="#10B981")
-        self.cpu_card = StatCard("CPU Load", "Dynamic Core Balancing", bar_color="#3B82F6")
-        self.auto_card = StatCard("Autonomous Engine", "Continuous Throttler & Compactor", bar_color="#F97316")
+        # Stacked Pages
+        self.stack = QStackedWidget()
 
-        cards_layout.addWidget(self.ram_card)
-        cards_layout.addWidget(self.cpu_card)
-        cards_layout.addWidget(self.auto_card)
-        main_layout.addLayout(cards_layout)
+        # PAGE 0: Overview
+        page_overview = QWidget()
+        ov_layout = QVBoxLayout(page_overview)
+        ov_layout.setContentsMargins(0, 0, 0, 0)
+        ov_layout.setSpacing(16)
 
-        # 3. Action Bar
-        action_bar = QHBoxLayout()
-        action_bar.setSpacing(10)
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(14)
+        self.ram_card = StatCard("RAM Usage", "Active & Anonymous Heap", bar_color="#10B981")
+        self.cpu_card = StatCard("CPU Load", "Dynamic Scheduling", bar_color="#3B82F6")
+        self.auto_card = StatCard("Autonomous Engine", "Every 1.0s Continuous", bar_color="#F97316")
+        cards_row.addWidget(self.ram_card)
+        cards_row.addWidget(self.cpu_card)
+        cards_row.addWidget(self.auto_card)
+        ov_layout.addLayout(cards_row)
 
-        self.btn_boost = QPushButton("⚡ INSTANT TURBO RECLAIM")
-        self.btn_boost.setObjectName("PrimaryActionButton")
-        self.btn_boost.clicked.connect(self._run_turbo_boost)
-        action_bar.addWidget(self.btn_boost, 2)
+        # Recent Top Consumers Mini-View
+        ov_lbl = QLabel("Top Memory Consumers (Active Application Heaps)")
+        ov_lbl.setStyleSheet("color: #71717A; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 10px;")
+        ov_layout.addWidget(ov_lbl)
 
-        self.btn_clean_workers = QPushButton("Kill Build Daemons & Workers")
-        self.btn_clean_workers.clicked.connect(self._run_clean_workers)
-        action_bar.addWidget(self.btn_clean_workers, 1)
+        self.mini_proc_table = QTableWidget()
+        self.mini_proc_table.setColumnCount(5)
+        self.mini_proc_table.setHorizontalHeaderLabels(["PID", "Process Name", "Memory (MB)", "CPU %", "Action"])
+        self.mini_proc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.mini_proc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.mini_proc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        ov_layout.addWidget(self.mini_proc_table)
 
-        self.btn_clean_thumbs = QPushButton("Purge Thumbnails Cache")
-        self.btn_clean_thumbs.clicked.connect(self._run_clean_thumbs)
-        action_bar.addWidget(self.btn_clean_thumbs, 1)
+        self.stack.addWidget(page_overview)
 
-        self.btn_throttle_all = QPushButton("Renice All Background Hogs")
-        self.btn_throttle_all.clicked.connect(self._run_throttle_hogs)
-        action_bar.addWidget(self.btn_throttle_all, 1)
-
-        main_layout.addLayout(action_bar)
-
-        # 4. Tabbed Views
-        self.tabs = QTabWidget()
-
-        # Tab 1: Active Process Inspector
-        self.tab_proc = QWidget()
-        proc_layout = QVBoxLayout(self.tab_proc)
-        proc_layout.setContentsMargins(12, 12, 12, 12)
-        proc_layout.setSpacing(10)
+        # PAGE 1: Full Process Inspector
+        page_procs = QWidget()
+        p_layout = QVBoxLayout(page_procs)
+        p_layout.setContentsMargins(0, 0, 0, 0)
+        p_layout.setSpacing(12)
 
         filter_row = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Filter processes by name, PID, or command...")
+        self.search_input.setObjectName("SearchBar")
+        self.search_input.setPlaceholderText("Filter processes by name, PID, or command line...")
         self.search_input.textChanged.connect(self._populate_table_filtered)
         filter_row.addWidget(self.search_input, 2)
 
@@ -216,11 +250,11 @@ class ZeroOptimizeApp(QMainWindow):
         self.cat_filter.currentIndexChanged.connect(self._populate_table_filtered)
         filter_row.addWidget(self.cat_filter, 1)
 
-        btn_refresh = QPushButton("Refresh")
-        btn_refresh.clicked.connect(self._refresh_processes)
-        filter_row.addWidget(btn_refresh)
-
-        proc_layout.addLayout(filter_row)
+        btn_ref = QPushButton("Refresh Table")
+        btn_ref.setProperty("class", "SecondaryAction")
+        btn_ref.clicked.connect(self._refresh_processes)
+        filter_row.addWidget(btn_ref)
+        p_layout.addLayout(filter_row)
 
         self.proc_table = QTableWidget()
         self.proc_table.setColumnCount(7)
@@ -230,41 +264,42 @@ class ZeroOptimizeApp(QMainWindow):
         self.proc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.proc_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         self.proc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.proc_table.setSortingEnabled(True)
-        proc_layout.addWidget(self.proc_table)
+        p_layout.addWidget(self.proc_table)
 
-        self.tabs.addTab(self.tab_proc, "Active Processes")
+        self.stack.addWidget(page_procs)
 
-        # Tab 2: Audit Log
-        self.tab_log = QWidget()
-        log_layout = QVBoxLayout(self.tab_log)
-        log_layout.setContentsMargins(12, 12, 12, 12)
+        # PAGE 2: Real-Time Audit Log
+        page_log = QWidget()
+        l_layout = QVBoxLayout(page_log)
+        l_layout.setContentsMargins(0, 0, 0, 0)
+        l_layout.setSpacing(10)
 
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.append(f"[{time.strftime('%X')}] Zero-Optimize initialized. Autonomous 1-second watchdog active.")
-        log_layout.addWidget(self.log_text)
+        self.log_text.append(f"[{time.strftime('%X')}] Zero-Optimize initialized. Autonomous engine active (1.0s interval).")
+        l_layout.addWidget(self.log_text)
 
-        btn_clear = QPushButton("Clear Log")
-        btn_clear.clicked.connect(lambda: self.log_text.clear())
-        log_layout.addWidget(btn_clear, alignment=Qt.AlignmentFlag.AlignRight)
+        b_clear = QPushButton("Clear Audit Log")
+        b_clear.setProperty("class", "SecondaryAction")
+        b_clear.clicked.connect(lambda: self.log_text.clear())
+        l_layout.addWidget(b_clear, alignment=Qt.AlignmentFlag.AlignRight)
 
-        self.tabs.addTab(self.tab_log, "Audit Log")
-        main_layout.addWidget(self.tabs)
+        self.stack.addWidget(page_log)
 
-        # 5. Footer
-        footer = QHBoxLayout()
-        self.chk_min_tray = QCheckBox("Minimize to system tray on close")
-        self.chk_min_tray.setChecked(True)
-        self.chk_min_tray.setStyleSheet("color: #71717A; font-size: 11px;")
-        footer.addWidget(self.chk_min_tray)
-        footer.addStretch()
+        stage_layout.addWidget(self.stack)
+        root_layout.addWidget(stage, 1)
 
-        self.update_status_lbl = QLabel("Updates: Suraj-Mavuleti/zero-optimize-updates")
-        self.update_status_lbl.setStyleSheet("color: #52525B; font-size: 11px; font-family: 'JetBrains Mono', monospace;")
-        footer.addWidget(self.update_status_lbl)
+    def _switch_view(self, index: int):
+        self.stack.setCurrentIndex(index)
+        titles = ["Overview", "Process Inspector", "Real-Time Audit"]
+        self.page_title_lbl.setText(titles[index])
 
-        main_layout.addLayout(footer)
+        # Update sidebar styling
+        buttons = [self.btn_nav_overview, self.btn_nav_procs, self.btn_nav_log]
+        for idx, btn in enumerate(buttons):
+            btn.setProperty("active", "true" if idx == index else "false")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
 
     def _setup_system_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
@@ -273,7 +308,7 @@ class ZeroOptimizeApp(QMainWindow):
         else:
             self.tray_icon.setIcon(self.windowIcon())
 
-        self.tray_icon.setToolTip("Zero-Optimize (Autonomous Linux Performance Guard)")
+        self.tray_icon.setToolTip("Zero-Optimize (Autonomous Performance Engine)")
 
         tray_menu = QMenu()
         tray_menu.setStyleSheet("""
@@ -286,7 +321,7 @@ class ZeroOptimizeApp(QMainWindow):
         act_show.triggered.connect(self.showNormal)
         tray_menu.addAction(act_show)
 
-        act_boost = QAction("Instant Turbo Reclaim", self)
+        act_boost = QAction("Instant Reclaim", self)
         act_boost.triggered.connect(self._run_turbo_boost)
         tray_menu.addAction(act_boost)
 
@@ -309,13 +344,9 @@ class ZeroOptimizeApp(QMainWindow):
                 self.activateWindow()
 
     def closeEvent(self, event):
-        if self.chk_min_tray.isChecked():
-            event.ignore()
-            self.hide()
-            # Silent minimize: zero annoying popups or balloon messages
-        else:
-            self.autoguard.stop()
-            event.accept()
+        # Silent minimize to tray with zero popups
+        event.ignore()
+        self.hide()
 
     def _log(self, msg: str):
         self.log_text.append(f"[{time.strftime('%X')}] {msg}")
@@ -353,7 +384,7 @@ class ZeroOptimizeApp(QMainWindow):
             f"Cycles: {cycles:,} · Freed: {freed_mb} MB"
         )
 
-        if time.time() - self._last_table_populate > 5.0 and self.tabs.currentIndex() == 0:
+        if time.time() - self._last_table_populate > 5.0 and self.stack.currentIndex() in (0, 1):
             self._refresh_processes()
 
     def _refresh_stats(self):
@@ -369,6 +400,29 @@ class ZeroOptimizeApp(QMainWindow):
         self._cached_processes = self.monitor.get_processes(limit=60)
         self._last_table_populate = time.time()
         self._populate_table_filtered()
+        self._populate_mini_table()
+
+    def _populate_mini_table(self):
+        # Top 8 consumers for overview page
+        top_procs = sorted(self._cached_processes, key=lambda x: x["rss_mb"], reverse=True)[:8]
+        self.mini_proc_table.setRowCount(len(top_procs))
+        for row, p in enumerate(top_procs):
+            pid = p["pid"]
+            self.mini_proc_table.setItem(row, 0, QTableWidgetItem(str(pid)))
+            self.mini_proc_table.setItem(row, 1, QTableWidgetItem(p["name"]))
+            self.mini_proc_table.setItem(row, 2, QTableWidgetItem(f"{p['rss_mb']:.1f} MB"))
+            self.mini_proc_table.setItem(row, 3, QTableWidgetItem(f"{p['cpu_pct']:.1f}%"))
+
+            act_btn = QPushButton("Kill")
+            act_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2);
+                    color: #F87171; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 4px;
+                }
+                QPushButton:hover { background: rgba(239, 68, 68, 0.2); }
+            """)
+            act_btn.clicked.connect(lambda _, target_pid=pid: self._action_kill(target_pid))
+            self.mini_proc_table.setCellWidget(row, 4, act_btn)
 
     def _populate_table_filtered(self):
         search_query = self.search_input.text().lower().strip()
@@ -393,44 +447,34 @@ class ZeroOptimizeApp(QMainWindow):
 
             filtered.append(p)
 
-        self.proc_table.setSortingEnabled(False)
         self.proc_table.setRowCount(len(filtered))
-
         for row, p in enumerate(filtered):
             pid = p["pid"]
             is_frozen = pid in self.optimizer.frozen_pids
             is_throttled = p["nice"] >= 10
 
-            pid_item = QTableWidgetItem(str(pid))
-            pid_item.setData(Qt.ItemDataRole.UserRole, pid)
-
+            self.proc_table.setItem(row, 0, QTableWidgetItem(str(pid)))
             name_item = QTableWidgetItem(p["name"])
             name_item.setToolTip(p["cmdline"][:160])
+            self.proc_table.setItem(row, 1, name_item)
 
             cat_item = QTableWidgetItem(p["category"])
             cat_item.setForeground(QColor("#71717A"))
+            self.proc_table.setItem(row, 2, cat_item)
 
             cpu_item = QTableWidgetItem(f"{p['cpu_pct']:.1f}%")
             if p["cpu_pct"] > 10.0:
                 cpu_item.setForeground(QColor("#EF4444"))
-            elif p["cpu_pct"] > 3.0:
-                cpu_item.setForeground(QColor("#F97316"))
+            self.proc_table.setItem(row, 3, cpu_item)
 
             ram_item = QTableWidgetItem(f"{p['rss_mb']:.1f} MB")
-            if p["rss_mb"] > 500:
-                ram_item.setForeground(QColor("#EF4444"))
-            elif p["rss_mb"] > 150:
+            if p["rss_mb"] > 400:
                 ram_item.setForeground(QColor("#F59E0B"))
+            self.proc_table.setItem(row, 4, ram_item)
 
             nice_item = QTableWidgetItem(str(p["nice"]))
             if is_throttled:
                 nice_item.setForeground(QColor("#10B981"))
-
-            self.proc_table.setItem(row, 0, pid_item)
-            self.proc_table.setItem(row, 1, name_item)
-            self.proc_table.setItem(row, 2, cat_item)
-            self.proc_table.setItem(row, 3, cpu_item)
-            self.proc_table.setItem(row, 4, ram_item)
             self.proc_table.setItem(row, 5, nice_item)
 
             act_widget = ProcessActionWidget(
@@ -444,8 +488,6 @@ class ZeroOptimizeApp(QMainWindow):
             act_widget.thaw_clicked.connect(self._action_thaw)
             act_widget.kill_clicked.connect(self._action_kill)
             self.proc_table.setCellWidget(row, 6, act_widget)
-
-        self.proc_table.setSortingEnabled(True)
 
     def _action_renice(self, pid: int):
         try:
@@ -471,20 +513,20 @@ class ZeroOptimizeApp(QMainWindow):
         self._refresh_processes()
 
     def _run_turbo_boost(self):
-        self.btn_boost.setEnabled(False)
-        self.btn_boost.setText("⚡ RECLAIMING...")
+        self.btn_quick_boost.setEnabled(False)
+        self.btn_quick_boost.setText("Reclaiming...")
         self.worker = BoostWorker(self.optimizer)
         self.worker.finished_signal.connect(self._on_boost_done)
         self.worker.start()
 
     def _on_boost_done(self, res: dict):
-        self.btn_boost.setEnabled(True)
-        self.btn_boost.setText("⚡ INSTANT TURBO RECLAIM")
+        self.btn_quick_boost.setEnabled(True)
+        self.btn_quick_boost.setText("⚡ Instant Reclaim")
         daemons = res.get("daemons", {})
         thumbs = res.get("thumbnails", {})
         cpu = res.get("cpu_tuning", {})
         refs = res.get("cleared_refs", 0)
-        self._log(f"Reclaim Complete: Cleared {refs} process memory pages, stopped {len(daemons.get('terminated_pids', []))} build daemons, throttled {cpu.get('reniced_count', 0)} background tasks.")
+        self._log(f"Reclaim Complete: Cleared {refs} memory pages, stopped {len(daemons.get('terminated_pids', []))} build daemons, balanced {cpu.get('reniced_count', 0)} background tasks.")
         self._refresh_stats()
         self._refresh_processes()
 
@@ -495,27 +537,6 @@ class ZeroOptimizeApp(QMainWindow):
         self._log(f"Cleaned stale workers & build daemons. Freed ~{round(freed, 1)} MB.")
         self._refresh_stats()
         self._refresh_processes()
-
-    def _run_clean_thumbs(self):
-        res = self.cleaner.clean_thumbnail_cache()
-        self._log(res.get("status"))
-        self._refresh_stats()
-
-    def _run_throttle_hogs(self):
-        res = self.optimizer.optimize_background_priorities()
-        self._log(res.get("status"))
-        self._refresh_processes()
-
-    def _manual_check_update(self):
-        self._log("Checking for updates from Suraj-Mavuleti/zero-optimize-updates...")
-        has_upd, meta = self.updater.check_for_updates()
-        if has_upd:
-            ver = meta.get("version")
-            self._log(f"New update found: v{ver}. Applying update in background...")
-            succ, msg = self.updater.apply_update(meta.get("download_url"))
-            self._log(f"Update Result: {msg}")
-        else:
-            self._log(f"Zero-Optimize is up to date (v{self.updater.current_version}).")
 
 
 def main():

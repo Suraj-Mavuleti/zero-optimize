@@ -1,174 +1,190 @@
 """
-Zero-Optimize Modern Minimal GUI Theme.
-Pure OLED dark luxe styling matching zero.skillissue.gg aesthetic.
+Zero-Optimize Modern Minimal Theme.
+Crafted to match zero.skillissue.gg and zero-music desktop web luxury aesthetic:
+- 250px left sidebar navigation with SVG icons and active accents
+- OLED pure dark canvas (#050507, #08080B)
+- Ultra-clean cards with subtle borders (rgba(255, 255, 255, 0.06))
+- Clean typography: Inter + JetBrains Mono
+- Zero AI-slop badges, zero gradients, zero gimmicks
 """
 
 ZERO_THEME = """
-QMainWindow, QWidget {
+/* ── Universal Reset ── */
+QWidget {
     background-color: #050507;
     color: #FFFFFF;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 13px;
+    selection-background-color: rgba(249, 115, 22, 0.25);
+    selection-color: #FFFFFF;
 }
 
-QFrame#HeaderCard {
-    background-color: #0A0A0E;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 14px;
+/* ── Left Sidebar (250px Luxury App Nav) ── */
+#Sidebar {
+    background-color: #08080B;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    min-width: 240px;
+    max-width: 240px;
 }
 
-QFrame.CardFrame {
-    background-color: #0E0E14;
+#SidebarBrand {
+    padding: 16px 12px 14px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.SidebarBlockTitle {
+    color: #52525B;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 14px 12px 6px 12px;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+QPushButton.SidebarNavBtn {
+    text-align: left;
+    height: 38px;
+    padding: 0 12px;
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #A1A1AA;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+QPushButton.SidebarNavBtn:hover {
+    color: #FFFFFF;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+QPushButton.SidebarNavBtn[active="true"] {
+    color: #FFFFFF;
+    background-color: rgba(255, 255, 255, 0.09);
+    font-weight: 600;
+}
+
+/* ── Main Canvas ── */
+#MainStage {
+    background-color: #050507;
+    padding: 24px;
+}
+
+/* ── Cards & Frames ── */
+QFrame.MetricCard {
+    background-color: #0B0B0F;
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px;
+    padding: 16px;
 }
 
-QLabel#CardTitle {
-    color: #A1A1AA;
+QFrame.MetricCard:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+QLabel.CardTitle {
+    color: #71717A;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
 }
 
-QLabel#CardValue {
+QLabel.CardValue {
     color: #FFFFFF;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 800;
     letter-spacing: -0.5px;
+    font-family: 'JetBrains Mono', monospace;
 }
 
-QLabel#CardSub {
-    color: #71717A;
+QLabel.CardSub {
+    color: #52525B;
     font-size: 11px;
     font-family: 'JetBrains Mono', monospace;
 }
 
-QLabel#LiveStatusBadge {
-    background: rgba(249, 115, 22, 0.12);
-    border: 1px solid rgba(249, 115, 22, 0.35);
-    color: #FB923C;
-    border-radius: 9999px;
-    padding: 4px 12px;
-    font-size: 11px;
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-}
-
-QPushButton {
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    color: #FFFFFF;
-    font-weight: 600;
-    padding: 7px 14px;
-}
-
-QPushButton:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.18);
-}
-
-QPushButton:pressed {
-    background-color: rgba(255, 255, 255, 0.03);
-}
-
-QPushButton#PrimaryActionButton {
+/* ── Primary Action Buttons ── */
+QPushButton#PrimaryAction {
     background-color: #FFFFFF;
     color: #000000;
     border: none;
-    border-radius: 9999px;
-    font-weight: 800;
-    font-size: 13px;
-    padding: 10px 20px;
-}
-
-QPushButton#PrimaryActionButton:hover {
-    background-color: #F3F4F6;
-}
-
-QTabWidget::pane {
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: #0A0A0E;
-    border-radius: 12px;
-    top: -1px;
-}
-
-QTabBar::tab {
-    background: transparent;
-    color: #71717A;
-    font-weight: 600;
-    padding: 8px 18px;
-    margin-right: 4px;
     border-radius: 8px;
-    font-size: 12px;
+    font-weight: 700;
+    font-size: 13px;
+    height: 38px;
+    padding: 0 18px;
 }
 
-QTabBar::tab:selected {
+QPushButton#PrimaryAction:hover {
+    background-color: #F4F4F5;
+}
+
+QPushButton.SecondaryAction {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
     color: #FFFFFF;
-    background: rgba(255, 255, 255, 0.06);
-}
-
-QTabBar::tab:hover:!selected {
-    color: #A1A1AA;
-}
-
-QTableWidget {
-    background-color: transparent;
-    border: none;
-    gridline-color: transparent;
-    selection-background-color: rgba(255, 255, 255, 0.06);
-    selection-color: #FFFFFF;
+    font-weight: 500;
     font-size: 12px;
+    height: 36px;
+    padding: 0 14px;
+}
+
+QPushButton.SecondaryAction:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* ── Process Table ── */
+QTableWidget {
+    background-color: #0B0B0F;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    gridline-color: transparent;
+    font-size: 12px;
+    outline: none;
+}
+
+QTableWidget::item {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+QTableWidget::item:selected {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #FFFFFF;
 }
 
 QHeaderView::section {
-    background-color: #0A0A0E;
+    background-color: #0B0B0F;
     color: #71717A;
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 8px 10px;
+    padding: 10px 10px;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
 }
 
-QLineEdit {
+/* ── Search Input ── */
+QLineEdit#SearchBar {
     background-color: #0E0E14;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
-    padding: 7px 12px;
+    padding: 8px 14px;
     color: #FFFFFF;
     font-size: 12px;
 }
 
-QLineEdit:focus {
+QLineEdit#SearchBar:focus {
     border-color: rgba(249, 115, 22, 0.5);
 }
 
-QProgressBar {
-    background-color: rgba(255, 255, 255, 0.05);
-    border: none;
-    border-radius: 3px;
-    height: 5px;
-    text-align: right;
-}
-
-QProgressBar::chunk {
-    border-radius: 3px;
-}
-
-QTextEdit {
-    background-color: #07070A;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    color: #D1D5DB;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    padding: 8px;
-}
-
+/* ── Minimal Scrollbar ── */
 QScrollBar:vertical {
     background: transparent;
     width: 6px;
