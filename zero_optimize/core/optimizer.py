@@ -179,7 +179,10 @@ class Optimizer:
         6. Compacts zram and memory if privileges exist
         """
         results = {}
-        mem_before = self.monitor.get_memory_usage().get("ram", {}).get("used_mb", 0)
+        mem_info_before = self.monitor.get_memory_usage().get("ram", {})
+        mem_before = mem_info_before.get("used_mb", 0)
+        free_before = mem_info_before.get("free_mb", 0)
+        cache_before = mem_info_before.get("cache_mb", 0)
 
         # 1. Clean safe user caches
         results["caches"] = self.cleaner.clean_safe_user_caches()
@@ -203,14 +206,20 @@ class Optimizer:
         # 7. Sync buffers
         self.cleaner.sync_disks()
 
-        # 7. Memory and zram compaction (with root helper if accessible)
+        # 8. Memory and zram compaction (with root helper if accessible)
         compacted, c_msg = self.cleaner.compact_memory_and_zram(allow_gui_prompt=allow_root_drop)
         results["compaction"] = {"success": compacted, "message": c_msg}
 
         time.sleep(0.1)
-        mem_after = self.monitor.get_memory_usage().get("ram", {}).get("used_mb", 0)
+        mem_info_after = self.monitor.get_memory_usage().get("ram", {})
+        mem_after = mem_info_after.get("used_mb", 0)
+        free_after = mem_info_after.get("free_mb", 0)
+        cache_after = mem_info_after.get("cache_mb", 0)
+
         direct_freed = results["daemons"].get("freed_mb", 0.0) + results["workers"].get("freed_mb", 0.0)
         ram_delta = max(0.0, float(mem_before - mem_after))
-        results["ram_freed_mb"] = max(ram_delta, direct_freed)
+        free_delta = max(0.0, float(free_after - free_before))
+        cache_delta = max(0.0, float(cache_before - cache_after))
+        results["ram_freed_mb"] = round(max(ram_delta, direct_freed, free_delta, cache_delta), 1)
 
         return results
