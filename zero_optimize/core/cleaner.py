@@ -21,8 +21,9 @@ SAFE_CACHE_DIRS = [
 ]
 
 BUILD_DAEMON_PATTERNS = [
-    "org.gradle.launcher.daemon", "gradle-daemon",
-    "org.jetbrains.kotlin.daemon", "kotlin-compiler",
+    "org.gradle.launcher.daemon", "gradle-daemon", "GradleDaemon",
+    "org.jetbrains.kotlin.daemon", "kotlin-compiler", "KotlinCompileDaemon",
+    "GradleWorkerMain"
 ]
 
 STALE_WORKER_PATTERNS = [
@@ -37,6 +38,7 @@ class Cleaner:
             self.helper_path = os.path.join(base_dir, "helper", "zero-optimize-root-helper")
         else:
             self.helper_path = helper_path
+        self._can_sudo: Optional[bool] = None
 
     def clean_safe_user_caches(self) -> Dict[str, Any]:
         """Cleans safe temporary caches (thumbnails, pip build caches) without affecting running apps."""
@@ -69,6 +71,27 @@ class Cleaner:
         terminated = []
         freed_mb = 0.0
         current_uid = os.getuid()
+
+        # If an active foreground/cli build wrapper is actively running, skip terminating daemons
+        try:
+            for entry in os.listdir("/proc"):
+                if not entry.isdigit():
+                    continue
+                cmd_p = f"/proc/{entry}/cmdline"
+                if os.path.exists(cmd_p):
+                    try:
+                        with open(cmd_p, "rb") as f:
+                            raw = f.read().replace(b"\x00", b" ").decode(errors="replace")
+                            if any(w in raw for w in ("gradle-wrapper.jar", "gradlew test", "gradlew build")):
+                                return {
+                                    "terminated_pids": [],
+                                    "freed_mb": 0.0,
+                                    "status": "Active build in progress, skipping daemon cleanup"
+                                }
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         try:
             for entry in os.listdir("/proc"):
@@ -191,18 +214,26 @@ class Cleaner:
         """Triggers zram and kernel memory compaction via helper if available."""
         self.sync_disks()
 
-        # 1. Try passwordless sudo first
-        try:
-            res = subprocess.run(
-                ["sudo", "-n", self.helper_path, "all"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if res.returncode == 0:
-                return True, "Caches dropped & zram compacted"
-        except Exception:
-            pass
+        # 1. Check if passwordless sudo is functional
+        if self._can_sudo is None:
+            try:
+                chk = subprocess.run(["sudo", "-n", "true"], capture_output=True, timeout=2)
+                self._can_sudo = (chk.returncode == 0)
+            except Exception:
+                self._can_sudo = False
+
+        if self._can_sudo:
+            try:
+                res = subprocess.run(
+                    ["sudo", "-n", self.helper_path, "all"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if res.returncode == 0:
+                    return True, "Caches dropped & zram compacted"
+            except Exception:
+                pass
 
         # 2. If allow_gui_prompt and pkexec is available (user-triggered action)
         if allow_gui_prompt and shutil.which("pkexec"):
@@ -214,6 +245,7 @@ class Cleaner:
                     timeout=20
                 )
                 if res.returncode == 0:
+                    self._can_sudo = True
                     return True, "Caches dropped & zram compacted via Polkit"
             except Exception:
                 pass

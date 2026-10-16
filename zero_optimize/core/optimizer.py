@@ -79,14 +79,15 @@ class Optimizer:
         """
         if exclude_names is None:
             exclude_names = {
-                "antigravity", "language_server", "kwin_wayland", "plasmashell",
-                "pipewire", "wireplumber", "systemd", "zero-optimize"
+                "antigravity", "language_server", "kwin_wayland", "kwin_x11", "plasmashell",
+                "pipewire", "wireplumber", "systemd", "zero-optimize", "dbus", "polkit",
+                "keyd", "sddm", "xwayland", "bash", "zsh", "sh"
             }
 
         snoozed = []
         current_uid = os.getuid()
 
-        for p in self.monitor.get_processes(limit=120):
+        for p in self.monitor.get_processes(limit=200):
             pid = p["pid"]
             name = p["name"].lower()
             cmd = p["cmdline"].lower()
@@ -95,27 +96,27 @@ class Optimizer:
             if uid != current_uid or p["is_protected"]:
                 continue
 
+            # Absolute protection for Antigravity, Language Server, and Core KDE Desktop
             if any(ex in name or ex in cmd for ex in exclude_names):
                 continue
 
-            is_target = any(t in name or t in cmd for t in ("discord", "browseros", "firedragon", "baloo", "kioworker"))
-
-            if is_target:
-                try:
-                    os.setpriority(os.PRIO_PROCESS, pid, 19)
-                    subprocess.run(
-                        ["ionice", "-c", "3", "-p", str(pid)],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        timeout=1
-                    )
-                    cr_path = f"/proc/{pid}/clear_refs"
-                    if os.path.exists(cr_path):
-                        with open(cr_path, "w") as f:
-                            f.write("1\n")
-                    snoozed.append(pid)
-                except Exception:
-                    pass
+            try:
+                # Deprioritize CPU and I/O to background idle priority
+                os.setpriority(os.PRIO_PROCESS, pid, 19)
+                subprocess.run(
+                    ["ionice", "-c", "3", "-p", str(pid)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=1
+                )
+                # Clear referenced bits so inactive heap gets swapped out to zram
+                cr_path = f"/proc/{pid}/clear_refs"
+                if os.path.exists(cr_path):
+                    with open(cr_path, "w") as f:
+                        f.write("1\n")
+                snoozed.append(pid)
+            except Exception:
+                pass
 
         try:
             subprocess.run(["balooctl6", "suspend"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)

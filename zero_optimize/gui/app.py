@@ -56,12 +56,15 @@ class EngineWorker(QObject):
             newly_reniced = tune_res.get("reniced_count", 0)
             self.total_throttled += newly_reniced
 
-            # Periodic background app sleep (every 15s)
-            if self.total_cycles % 15 == 0:
+            # Proactive background app sleep and build daemon sweep (every 10s)
+            if self.total_cycles % 10 == 0:
                 self.optimizer.snooze_background_apps()
+                d_res = self.optimizer.cleaner.clean_idle_build_daemons()
+                if d_res.get("freed_mb", 0) > 0:
+                    self.total_freed_mb += d_res["freed_mb"]
 
-            # Periodic non-destructive maintenance (every 45s)
-            if now - self._last_clean > 45.0:
+            # Periodic non-destructive maintenance (every 30s)
+            if now - self._last_clean > 30.0:
                 self._last_clean = now
                 boost_res = self.optimizer.run_smart_boost(allow_root_drop=False)
                 freed = boost_res.get("ram_freed_mb", 0.0) or boost_res.get("caches", {}).get("freed_mb", 0.0)
@@ -602,8 +605,13 @@ class ZeroOptimizeApp(QMainWindow):
 
     def _run_snooze_background(self):
         res = self.optimizer.snooze_background_apps()
+        d_res = self.optimizer.cleaner.clean_idle_build_daemons()
         count = res.get("snoozed_count", 0)
-        self._log(f"Background Apps Hibernated: Put {count} background tasks to low-power sleep (paged cold memory to zram). Antigravity and core desktop stay full speed.")
+        freed = d_res.get("freed_mb", 0.0)
+        msg = f"Background Apps Hibernated: Put {count} background tasks to low-power sleep (paged cold memory to zram)."
+        if freed > 0:
+            msg += f" Reclaimed {freed} MB from idle build daemons."
+        self._log(msg)
         self._refresh_stats()
         self._refresh_processes()
 
