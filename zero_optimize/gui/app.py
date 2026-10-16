@@ -10,6 +10,12 @@ Modern minimalist desktop architecture modeled on ZeroMusic's desktop shell:
 import sys
 import os
 import time
+
+# Ensure project root is always in sys.path
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
 from typing import Dict, Any, List
 
 from PyQt6.QtWidgets import (
@@ -53,8 +59,8 @@ class EngineWorker(QObject):
             # Periodic non-destructive maintenance (every 45s)
             if now - self._last_clean > 45.0:
                 self._last_clean = now
-                boost_res = self.optimizer.run_smart_boost()
-                freed = boost_res.get("caches", {}).get("freed_mb", 0.0)
+                boost_res = self.optimizer.run_smart_boost(allow_root_drop=False)
+                freed = boost_res.get("ram_freed_mb", 0.0) or boost_res.get("caches", {}).get("freed_mb", 0.0)
                 self.total_freed_mb += freed
 
             mem = self.monitor.get_memory_usage()
@@ -79,7 +85,7 @@ class BoostWorker(QThread):
         self.optimizer = optimizer
 
     def run(self):
-        res = self.optimizer.run_smart_boost(allow_root_drop=False)
+        res = self.optimizer.run_smart_boost(allow_root_drop=True)
         self.finished_signal.emit(res)
 
 
@@ -92,8 +98,7 @@ class ZeroOptimizeApp(QMainWindow):
         self.setMinimumSize(880, 560)
         self.setStyleSheet(ZERO_THEME)
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.icon_path = os.path.join(base_dir, "assets", "zero-optimize.svg")
+        self.icon_path = os.path.join(_PROJECT_ROOT, "assets", "zero-optimize.svg")
         if os.path.exists(self.icon_path):
             app_icon = QIcon(self.icon_path)
             self.setWindowIcon(app_icon)
@@ -251,9 +256,16 @@ class ZeroOptimizeApp(QMainWindow):
         ov_layout.addWidget(ov_lbl)
 
         self.mini_proc_table = QTableWidget()
-        self.mini_proc_table.setColumnCount(4)
-        self.mini_proc_table.setHorizontalHeaderLabels(["PID", "Process Name", "Memory (MB)", "CPU %"])
+        self.mini_proc_table.setColumnCount(5)
+        self.mini_proc_table.setHorizontalHeaderLabels(["PID", "Process Name", "Memory (MB)", "CPU %", "Actions"])
         self.mini_proc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.mini_proc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.mini_proc_table.setColumnWidth(4, 210)
+        self.mini_proc_table.verticalHeader().setVisible(False)
+        self.mini_proc_table.verticalHeader().setDefaultSectionSize(40)
+        self.mini_proc_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.mini_proc_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.mini_proc_table.setShowGrid(False)
         self.mini_proc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         ov_layout.addWidget(self.mini_proc_table)
 
@@ -300,7 +312,13 @@ class ZeroOptimizeApp(QMainWindow):
             "PID", "Name", "Category", "CPU %", "RAM (MB)", "Nice", "Action Controls"
         ])
         self.proc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.proc_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        self.proc_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        self.proc_table.setColumnWidth(6, 210)
+        self.proc_table.verticalHeader().setVisible(False)
+        self.proc_table.verticalHeader().setDefaultSectionSize(40)
+        self.proc_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.proc_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.proc_table.setShowGrid(False)
         self.proc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         p_layout.addWidget(self.proc_table)
 
@@ -420,7 +438,7 @@ class ZeroOptimizeApp(QMainWindow):
             f"Cycles: {cycles:,} · Freed: {freed_mb} MB"
         )
 
-        if time.time() - self._last_table_populate > 5.0 and self.stack.currentIndex() in (0, 1):
+        if time.time() - self._last_table_populate > 2.5 and self.stack.currentIndex() in (0, 1):
             self._refresh_processes()
 
     def _refresh_stats(self):
@@ -439,7 +457,9 @@ class ZeroOptimizeApp(QMainWindow):
         self._populate_mini_table()
 
     def _populate_mini_table(self):
-        top_procs = sorted(self._cached_processes, key=lambda x: x["rss_mb"], reverse=True)[:10]
+        if not self._cached_processes:
+            self._cached_processes = self.monitor.get_processes(limit=60)
+        top_procs = sorted(self._cached_processes, key=lambda x: x["rss_mb"], reverse=True)[:12]
         self.mini_proc_table.setRowCount(len(top_procs))
         for row, p in enumerate(top_procs):
             pid = p["pid"]
@@ -466,6 +486,22 @@ class ZeroOptimizeApp(QMainWindow):
             self.mini_proc_table.setItem(row, 1, name_item)
             self.mini_proc_table.setItem(row, 2, ram_item)
             self.mini_proc_table.setItem(row, 3, cpu_item)
+
+            is_frozen = pid in self.optimizer.frozen_pids
+            is_throttled = p["nice"] >= 10
+            act_widget = ProcessActionWidget(
+                pid,
+                is_frozen=is_frozen,
+                is_protected=p["is_protected"],
+                is_throttled=is_throttled
+            )
+            act_widget.renice_clicked.connect(self._action_renice)
+            act_widget.freeze_clicked.connect(self._action_freeze)
+            act_widget.thaw_clicked.connect(self._action_thaw)
+            act_widget.kill_clicked.connect(self._action_kill)
+            self.mini_proc_table.setCellWidget(row, 4, act_widget)
+
+        self.mini_proc_table.viewport().update()
 
     def _populate_table_filtered(self):
         search_query = self.search_input.text().lower().strip()
@@ -568,13 +604,18 @@ class ZeroOptimizeApp(QMainWindow):
         caches = res.get("caches", {})
         cpu = res.get("cpu_tuning", {})
         refs = res.get("cleared_refs", 0)
-        self._log(f"Reclaim Complete: Cleared {refs} process memory pages, balanced {cpu.get('reniced_count', 0)} background tasks, freed {caches.get('freed_mb', 0)} MB cache.")
+        ram_freed = res.get("ram_freed_mb", 0.0)
+        freed = ram_freed if ram_freed > 0 else caches.get("freed_mb", 0.0)
+        self.engine_worker.total_freed_mb += freed
+        comp_msg = res.get("compaction", {}).get("message", "Standard")
+        self._log(f"Reclaim Complete: Freed ~{freed:.1f} MB RAM ({comp_msg}), cleared {refs} process memory page refs, balanced {cpu.get('reniced_count', 0)} background tasks.")
         self._refresh_stats()
         self._refresh_processes()
 
 
 def main():
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     window = ZeroOptimizeApp()
     window.show()
     sys.exit(app.exec())

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Zero-Optimize GUI Launcher
-DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+DIR="/home/suraj/antigravity-projects/zero-optimize"
 export PYTHONPATH="$DIR:$PYTHONPATH"
-exec python3 "$DIR/zero_optimize/gui/app.py" "$@"
+export DISPLAY="${DISPLAY:-:0}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/1000}"
+
+cd "$DIR"
+exec /usr/bin/python3 "$DIR/zero_optimize/gui/app.py" "$@"

@@ -43,6 +43,19 @@ vacuum_journal() {
     fi
 }
 
+ensure_sudoers() {
+    if [ "$EUID" -eq 0 ] && [ ! -f /etc/sudoers.d/zero-optimize ]; then
+        mkdir -p /etc/sudoers.d
+        cat > /etc/sudoers.d/zero-optimize <<EOF
+%wheel ALL=(ALL) NOPASSWD: /home/suraj/antigravity-projects/zero-optimize/helper/zero-optimize-root-helper
+%wheel ALL=(ALL) NOPASSWD: /usr/local/bin/zero-optimize-root-helper
+suraj ALL=(ALL) NOPASSWD: /home/suraj/antigravity-projects/zero-optimize/helper/zero-optimize-root-helper
+suraj ALL=(ALL) NOPASSWD: /usr/local/bin/zero-optimize-root-helper
+EOF
+        chmod 0440 /etc/sudoers.d/zero-optimize 2>/dev/null || true
+    fi
+}
+
 case "$ACTION" in
     drop_caches)
         sync_and_drop_caches
@@ -55,6 +68,7 @@ case "$ACTION" in
         vacuum_journal
         ;;
     all)
+        ensure_sudoers
         sync_and_drop_caches
         compact_memory
         compact_zram

@@ -118,6 +118,7 @@ class Optimizer:
         6. Compacts zram and memory if privileges exist
         """
         results = {}
+        mem_before = self.monitor.get_memory_usage().get("ram", {}).get("used_mb", 0)
 
         # 1. Clean safe user caches
         results["caches"] = self.cleaner.clean_safe_user_caches()
@@ -134,8 +135,12 @@ class Optimizer:
         # 5. Sync buffers
         self.cleaner.sync_disks()
 
-        # 6. Memory and zram compaction
-        compacted, c_msg = self.cleaner.compact_memory_and_zram()
+        # 6. Memory and zram compaction (with root helper if accessible)
+        compacted, c_msg = self.cleaner.compact_memory_and_zram(allow_gui_prompt=allow_root_drop)
         results["compaction"] = {"success": compacted, "message": c_msg}
+
+        time.sleep(0.1)
+        mem_after = self.monitor.get_memory_usage().get("ram", {}).get("used_mb", 0)
+        results["ram_freed_mb"] = max(0.0, float(mem_before - mem_after))
 
         return results

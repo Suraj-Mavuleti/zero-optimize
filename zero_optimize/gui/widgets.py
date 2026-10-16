@@ -81,12 +81,12 @@ class ProcessActionWidget(QWidget):
         self.pid = pid
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 2, 4, 2)
-        layout.setSpacing(6)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(4)
 
         if is_protected:
             lbl = QLabel("Protected System")
-            lbl.setStyleSheet("color: #52525B; font-size: 10px; font-family: 'JetBrains Mono', monospace;")
+            lbl.setStyleSheet("color: #52525B; font-size: 11px; font-family: 'JetBrains Mono', monospace;")
             layout.addWidget(lbl)
             return
 
@@ -94,10 +94,10 @@ class ProcessActionWidget(QWidget):
         btn_renice = QPushButton("Throttled" if is_throttled else "Throttle")
         btn_renice.setStyleSheet("""
             QPushButton {
-                background: rgba(249, 115, 22, 0.08); border: 1px solid rgba(249, 115, 22, 0.2);
-                color: #FB923C; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px;
+                background: rgba(249, 115, 22, 0.1); border: 1px solid rgba(249, 115, 22, 0.25);
+                color: #FB923C; font-size: 11px; font-weight: 600; padding: 3px 6px; border-radius: 4px;
             }
-            QPushButton:hover { background: rgba(249, 115, 22, 0.2); }
+            QPushButton:hover { background: rgba(249, 115, 22, 0.25); }
         """)
         btn_renice.clicked.connect(lambda: self.renice_clicked.emit(self.pid))
         layout.addWidget(btn_renice)
@@ -107,20 +107,20 @@ class ProcessActionWidget(QWidget):
             btn_freeze = QPushButton("Resume")
             btn_freeze.setStyleSheet("""
                 QPushButton {
-                    background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2);
-                    color: #34D399; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px;
+                    background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25);
+                    color: #34D399; font-size: 11px; font-weight: 600; padding: 3px 6px; border-radius: 4px;
                 }
-                QPushButton:hover { background: rgba(16, 185, 129, 0.2); }
+                QPushButton:hover { background: rgba(16, 185, 129, 0.25); }
             """)
             btn_freeze.clicked.connect(lambda: self.thaw_clicked.emit(self.pid))
         else:
             btn_freeze = QPushButton("Pause")
             btn_freeze.setStyleSheet("""
                 QPushButton {
-                    background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2);
-                    color: #60A5FA; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px;
+                    background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25);
+                    color: #60A5FA; font-size: 11px; font-weight: 600; padding: 3px 6px; border-radius: 4px;
                 }
-                QPushButton:hover { background: rgba(59, 130, 246, 0.2); }
+                QPushButton:hover { background: rgba(59, 130, 246, 0.25); }
             """)
             btn_freeze.clicked.connect(lambda: self.freeze_clicked.emit(self.pid))
         layout.addWidget(btn_freeze)
@@ -129,10 +129,10 @@ class ProcessActionWidget(QWidget):
         btn_kill = QPushButton("Kill")
         btn_kill.setStyleSheet("""
             QPushButton {
-                background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2);
-                color: #F87171; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px;
+                background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25);
+                color: #F87171; font-size: 11px; font-weight: 600; padding: 3px 6px; border-radius: 4px;
             }
-            QPushButton:hover { background: rgba(239, 68, 68, 0.2); }
+            QPushButton:hover { background: rgba(239, 68, 68, 0.25); }
         """)
         btn_kill.clicked.connect(lambda: self.kill_clicked.emit(self.pid))
         layout.addWidget(btn_kill)

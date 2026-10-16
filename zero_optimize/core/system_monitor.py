@@ -198,8 +198,9 @@ class SystemMonitor:
 
     def get_processes(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Scans /proc/[pid] and computes CPU%, Memory, status, and category."""
+        now = time.time()
         if not self._last_proc_times:
-            # First time sampling processes, prime the previous table with a brief 0.1s sleep
+            # First time sampling processes, prime the previous table with a brief 0.08s sleep
             for entry in os.listdir("/proc"):
                 if not entry.isdigit():
                     continue
@@ -215,10 +216,11 @@ class SystemMonitor:
                 except Exception:
                     pass
             self._last_proc_sample_time = time.time()
-            time.sleep(0.12)
-            current_time = time.time()
-            time_delta = current_time - self._last_proc_sample_time
-            self._last_proc_sample_time = current_time
+            time.sleep(0.08)
+            now = time.time()
+
+        time_delta = max(0.05, now - self._last_proc_sample_time)
+        self._last_proc_sample_time = now
 
 
         uptime = self.get_uptime_seconds()

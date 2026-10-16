@@ -86,22 +86,36 @@ class Cleaner:
         except Exception:
             return False
 
-    def compact_memory_and_zram(self) -> Tuple[bool, str]:
+    def compact_memory_and_zram(self, allow_gui_prompt: bool = False) -> Tuple[bool, str]:
         """Triggers zram and kernel memory compaction via helper if available."""
         self.sync_disks()
 
-        # Try sudo without password prompt
+        # 1. Try passwordless sudo first
         try:
             res = subprocess.run(
-                ["sudo", "-n", self.helper_path, "compact"],
+                ["sudo", "-n", self.helper_path, "all"],
                 capture_output=True,
                 text=True,
-                timeout=3
+                timeout=5
             )
             if res.returncode == 0:
-                return True, "Memory & zram compacted"
+                return True, "Caches dropped & zram compacted"
         except Exception:
             pass
+
+        # 2. If allow_gui_prompt and pkexec is available (user-triggered action)
+        if allow_gui_prompt and shutil.which("pkexec"):
+            try:
+                res = subprocess.run(
+                    ["pkexec", self.helper_path, "all"],
+                    capture_output=True,
+                    text=True,
+                    timeout=20
+                )
+                if res.returncode == 0:
+                    return True, "Caches dropped & zram compacted via Polkit"
+            except Exception:
+                pass
 
         return False, "Non-root mode"
 
