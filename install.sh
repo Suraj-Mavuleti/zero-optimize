@@ -35,7 +35,12 @@ EOF
 
 chmod +x "$HOME/.local/share/applications/zero-optimise.desktop"
 
-# 5. Update desktop database
+# 5. Install systemd user service
+mkdir -p "$HOME/.config/systemd/user"
+cp "$DIR/systemd/zero-optimise-guard.service" "$HOME/.config/systemd/user/zero-optimise-guard.service"
+systemctl --user daemon-reload 2>/dev/null || true
+
+# 6. Update desktop database
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 fi
@@ -50,4 +55,7 @@ echo "=========================================================="
 echo "✨ Zero-Optimise successfully installed!"
 echo "• Launch GUI from app menu or terminal: zero-optimise"
 echo "• Launch CLI tool: zero-optimise-cli"
+echo "• Enable background auto-guard on boot (optional):"
+echo "  systemctl --user enable --now zero-optimise-guard"
 echo "=========================================================="
+
