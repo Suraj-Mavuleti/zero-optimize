@@ -439,14 +439,33 @@ class ZeroOptimizeApp(QMainWindow):
         self._populate_mini_table()
 
     def _populate_mini_table(self):
-        top_procs = sorted(self._cached_processes, key=lambda x: x["rss_mb"], reverse=True)[:8]
+        top_procs = sorted(self._cached_processes, key=lambda x: x["rss_mb"], reverse=True)[:10]
         self.mini_proc_table.setRowCount(len(top_procs))
         for row, p in enumerate(top_procs):
             pid = p["pid"]
-            self.mini_proc_table.setItem(row, 0, QTableWidgetItem(str(pid)))
-            self.mini_proc_table.setItem(row, 1, QTableWidgetItem(p["name"]))
-            self.mini_proc_table.setItem(row, 2, QTableWidgetItem(f"{p['rss_mb']:.1f} MB"))
-            self.mini_proc_table.setItem(row, 3, QTableWidgetItem(f"{p['cpu_pct']:.1f}%"))
+            pid_item = QTableWidgetItem(str(pid))
+            pid_item.setForeground(QColor("#71717A"))
+
+            name_item = QTableWidgetItem(p["name"])
+            name_item.setForeground(QColor("#FFFFFF"))
+
+            mem_val = f"{p['rss_mb']:.1f} MB"
+            ram_item = QTableWidgetItem(mem_val)
+            if p["rss_mb"] > 400:
+                ram_item.setForeground(QColor("#F59E0B"))
+            else:
+                ram_item.setForeground(QColor("#E4E4E7"))
+
+            cpu_item = QTableWidgetItem(f"{p['cpu_pct']:.1f}%")
+            if p["cpu_pct"] > 10.0:
+                cpu_item.setForeground(QColor("#EF4444"))
+            else:
+                cpu_item.setForeground(QColor("#A1A1AA"))
+
+            self.mini_proc_table.setItem(row, 0, pid_item)
+            self.mini_proc_table.setItem(row, 1, name_item)
+            self.mini_proc_table.setItem(row, 2, ram_item)
+            self.mini_proc_table.setItem(row, 3, cpu_item)
 
     def _populate_table_filtered(self):
         search_query = self.search_input.text().lower().strip()

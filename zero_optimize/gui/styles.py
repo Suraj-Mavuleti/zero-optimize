@@ -144,16 +144,18 @@ QTableWidget {
     border-radius: 12px;
     gridline-color: transparent;
     font-size: 12px;
+    color: #FFFFFF;
     outline: none;
 }
 
 QTableWidget::item {
-    padding: 6px 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    color: #FFFFFF;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 QTableWidget::item:selected {
-    background-color: rgba(255, 255, 255, 0.06);
+    background-color: rgba(255, 255, 255, 0.08);
     color: #FFFFFF;
 }
 
