@@ -1,6 +1,6 @@
 """
-Zero-Optimize System Optimizer Engine.
-Intelligently optimizes CPU scheduling, memory footprints, and manages background processes.
+Zero-Optimize Process Optimizer Module.
+Manages priority balancing, memory reclaiming, stale worker elimination, and CPU throttling.
 """
 
 import os
@@ -19,50 +19,51 @@ class Optimizer:
 
     def optimize_background_priorities(self) -> Dict[str, Any]:
         """
-        Lowers CPU (nice +15) and I/O priority (idle class) for heavy background renderers
-        and helper processes so interactive apps and games never stutter.
+        Dynamically adjusts scheduling priority for background hogs,
+        browser tabs, Discord workers, and compiler threads.
         """
         processes = self.monitor.get_processes()
         reniced = []
-        my_uid = os.getuid()
+        current_uid = os.getuid()
 
         for p in processes:
             pid = p["pid"]
-            category = p["category"]
-            user = p["user"]
-            uid = p.get("uid", -1)
             nice = p["nice"]
+            category = p["category"]
             name = p["name"]
+            uid = p.get("uid", 0)
 
             # Only manage our own user's processes
-            if uid != my_uid or p["is_protected"]:
+            if uid != current_uid:
                 continue
 
-            # Identify background candidates
+            # Skip core system processes
+            if p["is_protected"]:
+                continue
+
+            # Prioritize foreground / interactive applications (keep normal nice 0)
+            # Deprioritize background renderers, idle browser tabs, and heavy background daemons
             is_background_hog = category in ("browser_tab_renderer", "heavy_app") or (
-                any(kw in p["cmdline"].lower() for kw in [
-                    "--type=renderer", "discord", "steam", "firedragon -contentproc",
-                    "kioworker", "language_server"
-                ]) and not any(kw in p["cmdline"].lower() for kw in [
-                    "plasmashell", "kwin", "konsole", "alacritty", "kitty"
-                ])
+                p["cpu_pct"] > 5.0 and nice < 10 and category != "system_protected"
             )
 
-            if is_background_hog and nice < 10:
+            if is_background_hog and nice < 15:
                 try:
-                    # renice to +15 (lower priority)
                     os.setpriority(os.PRIO_PROCESS, pid, 15)
-                    # ionice to idle or best-effort low priority
-                    subprocess.run(["ionice", "-c", "2", "-n", "7", "-p", str(pid)], 
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    reniced.append({"pid": pid, "name": name, "old_nice": nice, "new_nice": 15})
+                    subprocess.run(
+                        ["ionice", "-c", "2", "-n", "7", "-p", str(pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=1
+                    )
+                    reniced.append({"pid": pid, "name": name, "new_nice": 15})
                 except Exception:
                     continue
 
         return {
             "reniced_count": len(reniced),
             "reniced_processes": reniced,
-            "status": f"Optimized CPU scheduling for {len(reniced)} background processes"
+            "status": f"Balanced CPU scheduling for {len(reniced)} background tasks"
         }
 
     def freeze_process(self, pid: int) -> Tuple[bool, str]:
@@ -90,7 +91,6 @@ class Optimizer:
         if pid in (1, 2) or pid == os.getpid():
             return False, "Cannot terminate core process"
 
-        # Check protected name
         try:
             with open(f"/proc/{pid}/comm", "r") as f:
                 comm = f.read().strip()
@@ -102,19 +102,20 @@ class Optimizer:
         try:
             sig = signal.SIGKILL if force else signal.SIGTERM
             os.kill(pid, sig)
-            return True, f"Sent {'SIGKILL' if force else 'SIGTERM'} to PID {pid}"
+            return True, f"Terminated PID {pid}"
         except Exception as e:
             return False, f"Failed to terminate process {pid}: {e}"
 
-    def run_smart_boost(self, allow_root_drop: bool = True) -> Dict[str, Any]:
+    def run_smart_boost(self, allow_root_drop: bool = False) -> Dict[str, Any]:
         """
-        Complete 1-Click System Optimization:
+        Complete Instant System Optimization (No Popups):
         1. Cleans user thumbnail cache
         2. Kills orphaned kioworkers
-        3. Vacuums user journal
-        4. Optimizes CPU priorities (renice background hogs)
-        5. Syncs filesystem buffers
-        6. Drops pagecache and compacts memory (if authorized)
+        3. Terminates stale build/Gradle daemons taking gigabytes
+        4. Clears page references in /proc/[pid]/clear_refs so inactive pages are evicted
+        5. Balances CPU priorities (renice background hogs to nice 15)
+        6. Vacuums systemd user journal
+        7. Flushes unwritten buffers to disk
         """
         results = {}
 
@@ -124,20 +125,25 @@ class Optimizer:
         # 2. Orphaned Workers
         results["workers"] = self.cleaner.clean_stale_kioworkers()
 
-        # 3. User Journal
+        # 3. Kill idle build daemons (Gradle/Kotlin/etc.)
+        results["daemons"] = self.cleaner.clean_idle_build_daemons()
+
+        # 4. User-level memory reference clearing (evicts cold heap pages)
+        results["cleared_refs"] = self.cleaner.clear_userspace_page_references()
+
+        # 5. User Journal
         results["journal"] = self.cleaner.vacuum_user_journal()
 
-        # 4. CPU Priority optimization
+        # 6. CPU Priority optimization
         results["cpu_tuning"] = self.optimize_background_priorities()
 
-        # 5. Privileged cache drop & compaction
-        cache_dropped = False
-        cache_msg = "Skipped"
-        if allow_root_drop:
-            cache_dropped, cache_msg = self.cleaner.drop_caches_privileged(use_gui_auth=True)
-            if cache_dropped:
-                self.cleaner.compact_memory_privileged(use_gui_auth=False)
+        # 7. Sync buffers to disk
+        self.cleaner.sync_disks()
 
+        # 8. Privileged cache drop (strictly without intrusive GUI popup)
+        cache_dropped, cache_msg = self.cleaner.drop_caches_privileged(use_gui_auth=False)
+        if cache_dropped:
+            self.cleaner.compact_memory_privileged(use_gui_auth=False)
         results["cache_drop"] = {"success": cache_dropped, "message": cache_msg}
 
         return results
