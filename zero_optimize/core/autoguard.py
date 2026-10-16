@@ -19,7 +19,7 @@ class AutoGuard:
     def __init__(
         self,
         optimizer: Optimizer = None,
-        ram_threshold: float = 70.0,
+        ram_threshold: float = 48.0,
         interval_seconds: float = 1.0
     ):
         self.optimizer = optimizer or Optimizer()
@@ -89,12 +89,13 @@ class AutoGuard:
                     self.optimizer.snooze_background_apps()
                     self.optimizer.cleaner.clear_userspace_page_references()
 
-                # Periodic deep maintenance (every 30s or when RAM exceeds threshold)
-                if (now - self._last_deep_clean > 30.0) or (ram_pct >= self.ram_threshold):
-                    self._last_deep_clean = now
-                    boost_res = self.optimizer.run_smart_boost(allow_root_drop=False)
-                    freed = boost_res.get("ram_freed_mb", 0.0) or boost_res.get("caches", {}).get("freed_mb", 0.0)
-                    self.total_freed_mb += freed
+                # Tight RAM Lock: Clamps memory if used exceeds 3500 MB or every 15s
+                if (now - self._last_deep_clean > 15.0) or (used_mb > 3500) or (ram_pct >= self.ram_threshold):
+                    if now - self._last_deep_clean > 5.0:  # Debounce at least 5s to keep CPU low
+                        self._last_deep_clean = now
+                        boost_res = self.optimizer.run_smart_boost(allow_root_drop=False)
+                        freed = boost_res.get("ram_freed_mb", 0.0) or boost_res.get("caches", {}).get("freed_mb", 0.0)
+                        self.total_freed_mb += freed
 
                 # 3. Check for updates periodically (every 30 mins)
                 if now - self._last_update_check > 1800.0:

@@ -56,21 +56,26 @@ class EngineWorker(QObject):
             newly_reniced = tune_res.get("reniced_count", 0)
             self.total_throttled += newly_reniced
 
-            # Proactive background app sleep and build daemon sweep (every 10s)
-            if self.total_cycles % 10 == 0:
+            # Check current memory pressure
+            mem = self.monitor.get_memory_usage()
+            ram_info = mem.get("ram", {})
+            used_mb = ram_info.get("used_mb", 0)
+
+            # Proactive background app sleep and build daemon sweep (every 10s or under memory pressure)
+            if self.total_cycles % 10 == 0 or used_mb > 3500:
                 self.optimizer.snooze_background_apps()
                 d_res = self.optimizer.cleaner.clean_idle_build_daemons()
                 if d_res.get("freed_mb", 0) > 0:
                     self.total_freed_mb += d_res["freed_mb"]
 
-            # Periodic non-destructive maintenance (every 30s)
-            if now - self._last_clean > 30.0:
-                self._last_clean = now
-                boost_res = self.optimizer.run_smart_boost(allow_root_drop=False)
-                freed = boost_res.get("ram_freed_mb", 0.0) or boost_res.get("caches", {}).get("freed_mb", 0.0)
-                self.total_freed_mb += freed
-
-            mem = self.monitor.get_memory_usage()
+            # Clamping RAM Lock: forces cgroup memory reclaim & drops pagecache if memory > 3500 MB or every 15s
+            if (now - self._last_clean > 15.0) or (used_mb > 3500):
+                if now - self._last_clean > 5.0:  # Debounce at least 5s to avoid excess CPU usage
+                    self._last_clean = now
+                    boost_res = self.optimizer.run_smart_boost(allow_root_drop=False)
+                    freed = boost_res.get("ram_freed_mb", 0.0) or boost_res.get("caches", {}).get("freed_mb", 0.0)
+                    self.total_freed_mb += freed
+                    mem = self.monitor.get_memory_usage()
             cpu = self.monitor.get_cpu_usage()
 
             self.tick_signal.emit({

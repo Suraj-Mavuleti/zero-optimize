@@ -52,6 +52,17 @@ reclaim_cgroup_memory() {
     done
 }
 
+tune_kernel_vm() {
+    # Dynamically tunes Linux VM parameters to prevent pagecache hoarding
+    # 1. Increase VFS cache pressure to 300 so unused directory/inode caches are released immediately
+    sysctl -w vm.vfs_cache_pressure=300 >/dev/null 2>&1 || true
+    # 2. Lower dirty ratios so write buffers flush to disk early instead of tying up RAM
+    sysctl -w vm.dirty_background_ratio=5 >/dev/null 2>&1 || true
+    sysctl -w vm.dirty_ratio=10 >/dev/null 2>&1 || true
+    # 3. Increase watermark scale factor so kswapd wakes early and steadily compresses cold pages
+    sysctl -w vm.watermark_scale_factor=100 >/dev/null 2>&1 || true
+}
+
 ensure_sudoers() {
     if [ "$EUID" -eq 0 ] && [ ! -f /etc/sudoers.d/zero-optimize ]; then
         mkdir -p /etc/sudoers.d
@@ -73,12 +84,17 @@ case "$ACTION" in
         compact_memory
         compact_zram
         reclaim_cgroup_memory
+        tune_kernel_vm
         ;;
     journal)
         vacuum_journal
         ;;
+    tune)
+        tune_kernel_vm
+        ;;
     all)
         ensure_sudoers
+        tune_kernel_vm
         sync_and_drop_caches
         compact_memory
         compact_zram
