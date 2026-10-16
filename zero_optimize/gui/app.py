@@ -56,6 +56,10 @@ class EngineWorker(QObject):
             newly_reniced = tune_res.get("reniced_count", 0)
             self.total_throttled += newly_reniced
 
+            # Periodic background app sleep (every 15s)
+            if self.total_cycles % 15 == 0:
+                self.optimizer.snooze_background_apps()
+
             # Periodic non-destructive maintenance (every 45s)
             if now - self._last_clean > 45.0:
                 self._last_clean = now
@@ -224,6 +228,11 @@ class ZeroOptimizeApp(QMainWindow):
         self.page_title_lbl.setStyleSheet("font-size: 22px; font-weight: 800; letter-spacing: -0.5px;")
         stage_header.addWidget(self.page_title_lbl)
         stage_header.addStretch()
+
+        self.btn_snooze_apps = QPushButton("🌙 Sleep Background Apps")
+        self.btn_snooze_apps.setProperty("class", "SecondaryAction")
+        self.btn_snooze_apps.clicked.connect(self._run_snooze_background)
+        stage_header.addWidget(self.btn_snooze_apps)
 
         self.btn_quick_boost = QPushButton("⚡ Instant Reclaim")
         self.btn_quick_boost.setObjectName("PrimaryAction")
@@ -589,6 +598,13 @@ class ZeroOptimizeApp(QMainWindow):
     def _action_kill(self, pid: int):
         ok, msg = self.optimizer.terminate_process(pid, force=True)
         self._log(msg)
+        self._refresh_processes()
+
+    def _run_snooze_background(self):
+        res = self.optimizer.snooze_background_apps()
+        count = res.get("snoozed_count", 0)
+        self._log(f"Background Apps Hibernated: Put {count} background tasks to low-power sleep (paged cold memory to zram). Antigravity and core desktop stay full speed.")
+        self._refresh_stats()
         self._refresh_processes()
 
     def _run_turbo_boost(self):

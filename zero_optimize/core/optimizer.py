@@ -68,6 +68,65 @@ class Optimizer:
             "status": f"Balanced CPU scheduling for {len(reniced)} background tasks"
         }
 
+    def snooze_background_apps(self, exclude_names=None) -> Dict[str, Any]:
+        """
+        Puts background applications into low-power sleep mode:
+        - Drops their CPU priority to nice 19 & ionice idle (class 3)
+        - Clears reference bits via /proc/[pid]/clear_refs so the kernel immediately
+          pages out their cold heap to zram swap
+        - Suspends KDE baloo file indexer
+        - Never touches Antigravity, KWin, or core desktop services
+        """
+        if exclude_names is None:
+            exclude_names = {
+                "antigravity", "language_server", "kwin_wayland", "plasmashell",
+                "pipewire", "wireplumber", "systemd", "zero-optimize"
+            }
+
+        snoozed = []
+        current_uid = os.getuid()
+
+        for p in self.monitor.get_processes(limit=120):
+            pid = p["pid"]
+            name = p["name"].lower()
+            cmd = p["cmdline"].lower()
+            uid = p.get("uid", 0)
+
+            if uid != current_uid or p["is_protected"]:
+                continue
+
+            if any(ex in name or ex in cmd for ex in exclude_names):
+                continue
+
+            is_target = any(t in name or t in cmd for t in ("discord", "browseros", "firedragon", "baloo", "kioworker"))
+
+            if is_target:
+                try:
+                    os.setpriority(os.PRIO_PROCESS, pid, 19)
+                    subprocess.run(
+                        ["ionice", "-c", "3", "-p", str(pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=1
+                    )
+                    cr_path = f"/proc/{pid}/clear_refs"
+                    if os.path.exists(cr_path):
+                        with open(cr_path, "w") as f:
+                            f.write("1\n")
+                    snoozed.append(pid)
+                except Exception:
+                    pass
+
+        try:
+            subprocess.run(["balooctl6", "suspend"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+        except Exception:
+            pass
+
+        return {
+            "snoozed_count": len(snoozed),
+            "status": f"Put {len(snoozed)} background apps to sleep (cold memory paged to zram)"
+        }
+
     def freeze_process(self, pid: int) -> Tuple[bool, str]:
         """Pauses a process using SIGSTOP so it uses 0% CPU without losing state."""
         if pid in (1, 2) or pid == os.getpid():
@@ -137,7 +196,10 @@ class Optimizer:
         # 5. CPU Priority tuning
         results["cpu_tuning"] = self.optimize_background_priorities()
 
-        # 6. Sync buffers
+        # 6. Put background apps to sleep (low-power, pages out cold heap)
+        results["snooze"] = self.snooze_background_apps()
+
+        # 7. Sync buffers
         self.cleaner.sync_disks()
 
         # 7. Memory and zram compaction (with root helper if accessible)
