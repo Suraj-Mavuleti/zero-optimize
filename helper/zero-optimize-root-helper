@@ -43,6 +43,15 @@ vacuum_journal() {
     fi
 }
 
+reclaim_cgroup_memory() {
+    # Proactively forces cold/inactive anonymous pages into ZRAM swap without killing anything
+    for r in /sys/fs/cgroup/user.slice/user-*.slice/memory.reclaim; do
+        if [ -w "$r" ]; then
+            echo "1G" > "$r" 2>/dev/null || true
+        fi
+    done
+}
+
 ensure_sudoers() {
     if [ "$EUID" -eq 0 ] && [ ! -f /etc/sudoers.d/zero-optimize ]; then
         mkdir -p /etc/sudoers.d
@@ -63,6 +72,7 @@ case "$ACTION" in
     compact)
         compact_memory
         compact_zram
+        reclaim_cgroup_memory
         ;;
     journal)
         vacuum_journal
@@ -73,6 +83,7 @@ case "$ACTION" in
         compact_memory
         compact_zram
         recompress_zram
+        reclaim_cgroup_memory
         vacuum_journal
         ;;
     *)
