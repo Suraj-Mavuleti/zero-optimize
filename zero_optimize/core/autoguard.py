@@ -1,6 +1,9 @@
 """
 Zero-Optimize Autonomous Continuous Guard.
-Runs every single second to maintain peak performance with zero popups and zero manual intervention.
+Non-destructive 1-second watchdog:
+- Balances process CPU priority every second
+- Cleans safe thumbnail caches and resets memory reference bits
+- Never terminates user processes automatically
 """
 
 import os
@@ -16,7 +19,7 @@ class AutoGuard:
     def __init__(
         self,
         optimizer: Optimizer = None,
-        ram_threshold: float = 80.0,
+        ram_threshold: float = 85.0,
         interval_seconds: float = 1.0
     ):
         self.optimizer = optimizer or Optimizer()
@@ -29,12 +32,10 @@ class AutoGuard:
         self._thread: Optional[threading.Thread] = None
         self._callback: Optional[Callable[[dict], None]] = None
 
-        # Continuous performance stats
         self.total_cycles: int = 0
         self.total_throttled_count: int = 0
         self.total_freed_mb: float = 0.0
         self._last_deep_clean: float = 0.0
-        self._last_worker_clean: float = 0.0
         self._last_update_check: float = 0.0
 
     def set_callback(self, cb: Callable[[dict], None]):
@@ -57,14 +58,13 @@ class AutoGuard:
         return self._running
 
     def _continuous_loop(self):
-        """Runs every 1 second without high CPU consumption."""
         while self._running:
             loop_start = time.time()
             self.total_cycles += 1
             now = time.time()
 
             try:
-                # 1. Continuous Background Priority Throttler (Runs every second)
+                # 1. Non-destructive priority balancing (every 1 second)
                 tune_res = self.optimizer.optimize_background_priorities()
                 newly_reniced = tune_res.get("reniced_count", 0)
                 if newly_reniced > 0:
@@ -74,34 +74,23 @@ class AutoGuard:
                 mem = self.monitor.get_memory_usage()
                 ram_info = mem.get("ram", {})
                 ram_pct = ram_info.get("percent", 0.0)
-                available_mb = ram_info.get("available_mb", 9999)
 
-                # Periodic deep memory maintenance (every 30s or when RAM >= 80%)
-                if (ram_pct >= self.ram_threshold or available_mb < 1200) and (now - self._last_deep_clean > 30.0):
+                # Periodic non-destructive maintenance (every 45s)
+                if now - self._last_deep_clean > 45.0:
                     self._last_deep_clean = now
-                    boost_res = self.optimizer.run_smart_boost(allow_root_drop=False)
-                    freed = boost_res.get("thumbnails", {}).get("freed_mb", 0.0)
-                    freed += boost_res.get("daemons", {}).get("freed_mb", 0.0)
+                    boost_res = self.optimizer.run_smart_boost()
+                    freed = boost_res.get("caches", {}).get("freed_mb", 0.0)
                     self.total_freed_mb += freed
 
-                # 3. Clean orphaned kioworkers & stale background indexers every 20 seconds
-                if now - self._last_worker_clean > 20.0:
-                    self._last_worker_clean = now
-                    w_res = self.optimizer.cleaner.clean_stale_kioworkers()
-                    d_res = self.optimizer.cleaner.clean_idle_build_daemons()
-                    self.total_freed_mb += w_res.get("freed_mb", 0.0) + d_res.get("freed_mb", 0.0)
-
-                # 4. Background auto-update check every 30 minutes
+                # 3. Check for updates periodically (every 30 mins)
                 if now - self._last_update_check > 1800.0:
                     self._last_update_check = now
                     has_upd, meta = self.updater.check_for_updates()
                     if has_upd and meta.get("download_url"):
                         self.updater.apply_update(meta["download_url"])
 
-                # 5. CPU usage sample
                 cpu = self.monitor.get_cpu_usage()
 
-                # Emit real-time tick to GUI
                 if self._callback:
                     self._callback({
                         "type": "second_tick",
@@ -116,7 +105,6 @@ class AutoGuard:
             except Exception:
                 pass
 
-            # Sleep remainder of 1 second
             elapsed = time.time() - loop_start
             sleep_time = max(0.05, self.interval_seconds - elapsed)
             time.sleep(sleep_time)

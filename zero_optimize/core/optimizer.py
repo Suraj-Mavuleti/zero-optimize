@@ -1,6 +1,10 @@
 """
 Zero-Optimize Process Optimizer Module.
-Manages priority balancing, memory reclaiming, stale worker elimination, and CPU throttling.
+Purely non-destructive scheduling and memory optimization:
+- Never automatically terminates any user process
+- Balances CPU priorities (renices background renderers and tabs to nice 15)
+- Clears page reference bits to assist Linux kernel & zram compaction
+- Syncs filesystem buffers
 """
 
 import os
@@ -20,7 +24,7 @@ class Optimizer:
     def optimize_background_priorities(self) -> Dict[str, Any]:
         """
         Dynamically adjusts scheduling priority for background hogs,
-        browser tabs, Discord workers, and compiler threads.
+        idle browser tabs, Discord renderers, etc. (Non-destructive).
         """
         processes = self.monitor.get_processes()
         reniced = []
@@ -33,16 +37,13 @@ class Optimizer:
             name = p["name"]
             uid = p.get("uid", 0)
 
-            # Only manage our own user's processes
             if uid != current_uid:
                 continue
 
-            # Skip core system processes
             if p["is_protected"]:
                 continue
 
-            # Prioritize foreground / interactive applications (keep normal nice 0)
-            # Deprioritize background renderers, idle browser tabs, and heavy background daemons
+            # Deprioritize background renderers and heavy idle processes to nice 15
             is_background_hog = category in ("browser_tab_renderer", "heavy_app") or (
                 p["cpu_pct"] > 5.0 and nice < 10 and category != "system_protected"
             )
@@ -67,13 +68,13 @@ class Optimizer:
         }
 
     def freeze_process(self, pid: int) -> Tuple[bool, str]:
-        """Pauses a process using SIGSTOP so it uses 0% CPU and 0% disk while remaining alive."""
+        """Pauses a process using SIGSTOP so it uses 0% CPU without losing state."""
         if pid in (1, 2) or pid == os.getpid():
             return False, "Cannot freeze core process"
         try:
             os.kill(pid, signal.SIGSTOP)
             self.frozen_pids.add(pid)
-            return True, f"Process {pid} suspended (0% CPU)"
+            return True, f"Process {pid} paused (0% CPU)"
         except Exception as e:
             return False, f"Failed freezing process {pid}: {e}"
 
@@ -87,7 +88,7 @@ class Optimizer:
             return False, f"Failed resuming process {pid}: {e}"
 
     def terminate_process(self, pid: int, force: bool = False) -> Tuple[bool, str]:
-        """Safely terminates a process."""
+        """Only executed when explicitly requested by user clicking the Kill button."""
         if pid in (1, 2) or pid == os.getpid():
             return False, "Cannot terminate core process"
 
@@ -95,7 +96,7 @@ class Optimizer:
             with open(f"/proc/{pid}/comm", "r") as f:
                 comm = f.read().strip()
             if comm in PROTECTED_COMM_NAMES:
-                return False, f"Process {comm} (PID {pid}) is protected from termination"
+                return False, f"Process {comm} (PID {pid}) is protected"
         except Exception:
             pass
 
@@ -108,42 +109,33 @@ class Optimizer:
 
     def run_smart_boost(self, allow_root_drop: bool = False) -> Dict[str, Any]:
         """
-        Complete Instant System Optimization (No Popups):
-        1. Cleans user thumbnail cache
-        2. Kills orphaned kioworkers
-        3. Terminates stale build/Gradle daemons taking gigabytes
-        4. Clears page references in /proc/[pid]/clear_refs so inactive pages are evicted
-        5. Balances CPU priorities (renice background hogs to nice 15)
-        6. Vacuums systemd user journal
-        7. Flushes unwritten buffers to disk
+        Safe, Non-Destructive System Optimization:
+        1. Cleans safe disk caches (~/.cache/thumbnails, ~/.cache/pip)
+        2. Clears userspace page reference bits (/proc/[pid]/clear_refs) so idle memory can be paged/compacted
+        3. Vacuums systemd user journal
+        4. Balances CPU priorities for background hogs
+        5. Syncs filesystem buffers to disk
+        6. Compacts zram and memory if privileges exist
         """
         results = {}
 
-        # 1. Thumbnails
-        results["thumbnails"] = self.cleaner.clean_thumbnail_cache()
+        # 1. Clean safe user caches
+        results["caches"] = self.cleaner.clean_safe_user_caches()
 
-        # 2. Orphaned Workers
-        results["workers"] = self.cleaner.clean_stale_kioworkers()
-
-        # 3. Kill idle build daemons (Gradle/Kotlin/etc.)
-        results["daemons"] = self.cleaner.clean_idle_build_daemons()
-
-        # 4. User-level memory reference clearing (evicts cold heap pages)
+        # 2. Reset page reference bits (non-destructive)
         results["cleared_refs"] = self.cleaner.clear_userspace_page_references()
 
-        # 5. User Journal
+        # 3. User Journal
         results["journal"] = self.cleaner.vacuum_user_journal()
 
-        # 6. CPU Priority optimization
+        # 4. CPU Priority tuning
         results["cpu_tuning"] = self.optimize_background_priorities()
 
-        # 7. Sync buffers to disk
+        # 5. Sync buffers
         self.cleaner.sync_disks()
 
-        # 8. Privileged cache drop (strictly without intrusive GUI popup)
-        cache_dropped, cache_msg = self.cleaner.drop_caches_privileged(use_gui_auth=False)
-        if cache_dropped:
-            self.cleaner.compact_memory_privileged(use_gui_auth=False)
-        results["cache_drop"] = {"success": cache_dropped, "message": cache_msg}
+        # 6. Memory and zram compaction
+        compacted, c_msg = self.cleaner.compact_memory_and_zram()
+        results["compaction"] = {"success": compacted, "message": c_msg}
 
         return results

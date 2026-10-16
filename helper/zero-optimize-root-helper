@@ -1,36 +1,45 @@
 #!/bin/bash
 # Zero-Optimize privileged system helper
-# Performs root-level memory drop_caches, compaction, and journal vacuuming.
+# Performs root-level memory optimization without killing user processes:
+# 1. sync filesystem buffers
+# 2. drop slab caches and inode buffers (/proc/sys/vm/drop_caches)
+# 3. compact memory pages (/proc/sys/vm/compact_memory)
+# 4. compact zram in-memory compressed blocks (/sys/block/zram0/compact)
+# 5. trigger zram memory recompression (/sys/block/zram0/recompress)
 
 set -e
 
 ACTION="${1:-all}"
 
-echo "[Zero-Optimize Helper] Executing action: $ACTION"
-
 sync_and_drop_caches() {
-    echo "Syncing filesystems..."
     sync
-    echo "Dropping pagecache, dentries, and inodes..."
     if [ -w /proc/sys/vm/drop_caches ]; then
         echo 3 > /proc/sys/vm/drop_caches
-    else
-        echo "Error: /proc/sys/vm/drop_caches not writable" >&2
-        exit 1
     fi
 }
 
 compact_memory() {
-    echo "Compacting memory pages to alleviate kswapd0 thrashing..."
     if [ -w /proc/sys/vm/compact_memory ]; then
         echo 1 > /proc/sys/vm/compact_memory
     fi
 }
 
+compact_zram() {
+    # Alleviates zram memory fragmentation and compresses stored swap pages tighter
+    if [ -w /sys/block/zram0/compact ]; then
+        echo 1 > /sys/block/zram0/compact 2>/dev/null || true
+    fi
+}
+
+recompress_zram() {
+    if [ -w /sys/block/zram0/recompress ]; then
+        echo 1 > /sys/block/zram0/recompress 2>/dev/null || true
+    fi
+}
+
 vacuum_journal() {
-    echo "Vacuuming systemd journal logs..."
     if command -v journalctl >/dev/null 2>&1; then
-        journalctl --vacuum-time=3d --vacuum-size=100M >/dev/null 2>&1 || true
+        journalctl --vacuum-size=20M >/dev/null 2>&1 || true
     fi
 }
 
@@ -40,6 +49,7 @@ case "$ACTION" in
         ;;
     compact)
         compact_memory
+        compact_zram
         ;;
     journal)
         vacuum_journal
@@ -47,6 +57,8 @@ case "$ACTION" in
     all)
         sync_and_drop_caches
         compact_memory
+        compact_zram
+        recompress_zram
         vacuum_journal
         ;;
     *)
@@ -55,5 +67,4 @@ case "$ACTION" in
         ;;
 esac
 
-echo "[Zero-Optimize Helper] Completed successfully."
 exit 0
