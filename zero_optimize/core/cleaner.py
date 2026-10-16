@@ -10,6 +10,7 @@ Performs strictly NON-DESTRUCTIVE system memory optimization:
 import os
 import glob
 import shutil
+import signal
 import subprocess
 from typing import Dict, List, Any, Tuple
 
@@ -17,6 +18,15 @@ SAFE_CACHE_DIRS = [
     os.path.expanduser("~/.cache/thumbnails"),
     os.path.expanduser("~/.cache/pip"),
     os.path.expanduser("~/.cache/go-build"),
+]
+
+BUILD_DAEMON_PATTERNS = [
+    "org.gradle.launcher.daemon", "gradle-daemon",
+    "org.jetbrains.kotlin.daemon", "kotlin-compiler",
+]
+
+STALE_WORKER_PATTERNS = [
+    "kioworker", "kio_thumbnail"
 ]
 
 
@@ -52,6 +62,97 @@ class Cleaner:
             "freed_mb": freed_mb,
             "deleted_count": deleted_count,
             "status": f"Cleaned {deleted_count} cache files, freed {freed_mb} MB"
+        }
+
+    def clean_idle_build_daemons(self) -> Dict[str, Any]:
+        """Terminates forgotten background compilation & Gradle daemons holding gigabytes of RAM & CPU."""
+        terminated = []
+        freed_mb = 0.0
+        current_uid = os.getuid()
+
+        try:
+            for entry in os.listdir("/proc"):
+                if not entry.isdigit():
+                    continue
+                pid = int(entry)
+                proc_path = f"/proc/{pid}"
+
+                try:
+                    if os.stat(proc_path).st_uid != current_uid:
+                        continue
+
+                    cmd_path = f"{proc_path}/cmdline"
+                    if not os.path.exists(cmd_path):
+                        continue
+
+                    with open(cmd_path, "rb") as f:
+                        cmd = f.read().replace(b"\x00", b" ").decode(errors="replace")
+
+                    if any(pat in cmd for pat in BUILD_DAEMON_PATTERNS):
+                        try:
+                            with open(f"{proc_path}/statm", "r") as f:
+                                rss_pages = int(f.read().split()[1])
+                                rss_mb = (rss_pages * 4096) / (1024 * 1024)
+                        except Exception:
+                            rss_mb = 0.0
+
+                        os.kill(pid, signal.SIGKILL)
+                        freed_mb += rss_mb
+                        terminated.append(pid)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        return {
+            "terminated_pids": terminated,
+            "freed_mb": round(freed_mb, 1),
+            "status": f"Terminated {len(terminated)} orphaned build daemon(s), reclaimed {round(freed_mb, 1)} MB"
+        }
+
+    def clean_stale_kioworkers(self) -> Dict[str, Any]:
+        """Terminates hanging KDE KIO thumbnail workers and stale file preview daemons."""
+        terminated = []
+        freed_mb = 0.0
+        current_uid = os.getuid()
+
+        try:
+            for entry in os.listdir("/proc"):
+                if not entry.isdigit():
+                    continue
+                pid = int(entry)
+                proc_path = f"/proc/{pid}"
+
+                try:
+                    if os.stat(proc_path).st_uid != current_uid:
+                        continue
+
+                    cmd_path = f"{proc_path}/cmdline"
+                    if not os.path.exists(cmd_path):
+                        continue
+
+                    with open(cmd_path, "rb") as f:
+                        cmd = f.read().replace(b"\x00", b" ").decode(errors="replace").lower()
+
+                    if any(pat in cmd for pat in STALE_WORKER_PATTERNS):
+                        try:
+                            with open(f"{proc_path}/statm", "r") as f:
+                                rss_pages = int(f.read().split()[1])
+                                freed_mb += (rss_pages * 4096) / (1024 * 1024)
+                        except Exception:
+                            pass
+
+                        os.kill(pid, signal.SIGTERM)
+                        terminated.append(pid)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        return {
+            "terminated_pids": terminated,
+            "freed_mb": round(freed_mb, 1),
+            "status": f"Terminated {len(terminated)} stale worker(s)"
         }
 
     def clear_userspace_page_references(self) -> int:

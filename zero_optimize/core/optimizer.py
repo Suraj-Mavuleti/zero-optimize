@@ -8,6 +8,7 @@ Purely non-destructive scheduling and memory optimization:
 """
 
 import os
+import time
 import signal
 import subprocess
 from typing import Dict, List, Any, Tuple
@@ -123,24 +124,30 @@ class Optimizer:
         # 1. Clean safe user caches
         results["caches"] = self.cleaner.clean_safe_user_caches()
 
-        # 2. Reset page reference bits (non-destructive)
+        # 2. Terminate idle build daemons and stale workers holding gigabytes
+        results["daemons"] = self.cleaner.clean_idle_build_daemons()
+        results["workers"] = self.cleaner.clean_stale_kioworkers()
+
+        # 3. Reset page reference bits (non-destructive)
         results["cleared_refs"] = self.cleaner.clear_userspace_page_references()
 
-        # 3. User Journal
+        # 4. User Journal
         results["journal"] = self.cleaner.vacuum_user_journal()
 
-        # 4. CPU Priority tuning
+        # 5. CPU Priority tuning
         results["cpu_tuning"] = self.optimize_background_priorities()
 
-        # 5. Sync buffers
+        # 6. Sync buffers
         self.cleaner.sync_disks()
 
-        # 6. Memory and zram compaction (with root helper if accessible)
+        # 7. Memory and zram compaction (with root helper if accessible)
         compacted, c_msg = self.cleaner.compact_memory_and_zram(allow_gui_prompt=allow_root_drop)
         results["compaction"] = {"success": compacted, "message": c_msg}
 
         time.sleep(0.1)
         mem_after = self.monitor.get_memory_usage().get("ram", {}).get("used_mb", 0)
-        results["ram_freed_mb"] = max(0.0, float(mem_before - mem_after))
+        direct_freed = results["daemons"].get("freed_mb", 0.0) + results["workers"].get("freed_mb", 0.0)
+        ram_delta = max(0.0, float(mem_before - mem_after))
+        results["ram_freed_mb"] = max(ram_delta, direct_freed)
 
         return results
