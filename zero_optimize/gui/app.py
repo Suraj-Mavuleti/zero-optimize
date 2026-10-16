@@ -4,7 +4,7 @@ Modern minimalist desktop architecture modeled on ZeroMusic's desktop shell:
 - 240px native left sidebar (Dashboard, Processes, Cleaners, Daemon status)
 - Clean metric telemetry tiles with real-time gauges
 - Process management with individual kill, throttle, and freeze actions
-- Continuous 1.0s autonomous engine with zero annoying popups
+- Thread-safe QTimer & QThread autonomous engine (prevents cross-thread crashes)
 """
 
 import sys
@@ -15,19 +15,60 @@ from typing import Dict, Any, List
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QHeaderView, QLineEdit, QComboBox, QTextEdit, QCheckBox,
+    QHeaderView, QLineEdit, QComboBox, QTextEdit,
     QSystemTrayIcon, QMenu, QFrame
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
 from PyQt6.QtGui import QIcon, QFont, QColor, QAction
 
 from zero_optimize.core.system_monitor import SystemMonitor
 from zero_optimize.core.optimizer import Optimizer
 from zero_optimize.core.cleaner import Cleaner
-from zero_optimize.core.autoguard import AutoGuard
 from zero_optimize.core.updater import AutoUpdater
 from zero_optimize.gui.styles import ZERO_THEME
 from zero_optimize.gui.widgets import StatCard, ProcessActionWidget
+
+
+class EngineWorker(QObject):
+    tick_signal = pyqtSignal(dict)
+
+    def __init__(self, optimizer: Optimizer, monitor: SystemMonitor):
+        super().__init__()
+        self.optimizer = optimizer
+        self.monitor = monitor
+        self.total_cycles = 0
+        self.total_throttled = 0
+        self.total_freed_mb = 0.0
+        self._last_clean = 0.0
+
+    def run_tick(self):
+        self.total_cycles += 1
+        now = time.time()
+        try:
+            # Non-destructive priority balancing every second
+            tune_res = self.optimizer.optimize_background_priorities()
+            newly_reniced = tune_res.get("reniced_count", 0)
+            self.total_throttled += newly_reniced
+
+            # Periodic non-destructive maintenance (every 45s)
+            if now - self._last_clean > 45.0:
+                self._last_clean = now
+                boost_res = self.optimizer.run_smart_boost()
+                freed = boost_res.get("caches", {}).get("freed_mb", 0.0)
+                self.total_freed_mb += freed
+
+            mem = self.monitor.get_memory_usage()
+            cpu = self.monitor.get_cpu_usage()
+
+            self.tick_signal.emit({
+                "cycles": self.total_cycles,
+                "throttled_total": self.total_throttled,
+                "freed_mb": round(self.total_freed_mb, 1),
+                "mem": mem,
+                "cpu": cpu
+            })
+        except Exception:
+            pass
 
 
 class BoostWorker(QThread):
@@ -62,7 +103,6 @@ class ZeroOptimizeApp(QMainWindow):
         self.monitor = SystemMonitor()
         self.cleaner = Cleaner()
         self.optimizer = Optimizer(monitor=self.monitor, cleaner=self.cleaner)
-        self.autoguard = AutoGuard(optimizer=self.optimizer, interval_seconds=1.0)
         self.updater = AutoUpdater()
 
         self._cached_processes: List[Dict[str, Any]] = []
@@ -71,9 +111,14 @@ class ZeroOptimizeApp(QMainWindow):
         self._setup_ui()
         self._setup_system_tray()
 
-        # Connect 1-second autonomous engine
-        self.autoguard.set_callback(self._on_engine_tick)
-        self.autoguard.start()
+        # Thread-safe Engine Loop using QTimer (Prevents cross-thread GUI segmentation faults)
+        self.engine_worker = EngineWorker(self.optimizer, self.monitor)
+        self.engine_worker.tick_signal.connect(self._on_engine_tick)
+
+        self.engine_timer = QTimer(self)
+        self.engine_timer.setInterval(1000)  # Exactly 1.0 second loop
+        self.engine_timer.timeout.connect(self.engine_worker.run_tick)
+        self.engine_timer.start()
 
         # Initial refresh
         self._refresh_stats()
@@ -180,11 +225,6 @@ class ZeroOptimizeApp(QMainWindow):
         self.btn_quick_boost.clicked.connect(self._run_turbo_boost)
         stage_header.addWidget(self.btn_quick_boost)
 
-        self.btn_clean_daemons = QPushButton("Kill Build Daemons")
-        self.btn_clean_daemons.setProperty("class", "SecondaryAction")
-        self.btn_clean_daemons.clicked.connect(self._run_clean_workers)
-        stage_header.addWidget(self.btn_clean_daemons)
-
         stage_layout.addLayout(stage_header)
 
         # Stacked Pages
@@ -206,16 +246,14 @@ class ZeroOptimizeApp(QMainWindow):
         cards_row.addWidget(self.auto_card)
         ov_layout.addLayout(cards_row)
 
-        # Recent Top Consumers Mini-View
         ov_lbl = QLabel("Top Memory Consumers (Active Application Heaps)")
         ov_lbl.setStyleSheet("color: #71717A; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 10px;")
         ov_layout.addWidget(ov_lbl)
 
         self.mini_proc_table = QTableWidget()
-        self.mini_proc_table.setColumnCount(5)
-        self.mini_proc_table.setHorizontalHeaderLabels(["PID", "Process Name", "Memory (MB)", "CPU %", "Action"])
+        self.mini_proc_table.setColumnCount(4)
+        self.mini_proc_table.setHorizontalHeaderLabels(["PID", "Process Name", "Memory (MB)", "CPU %"])
         self.mini_proc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.mini_proc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.mini_proc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         ov_layout.addWidget(self.mini_proc_table)
 
@@ -294,7 +332,6 @@ class ZeroOptimizeApp(QMainWindow):
         titles = ["Overview", "Process Inspector", "Real-Time Audit"]
         self.page_title_lbl.setText(titles[index])
 
-        # Update sidebar styling
         buttons = [self.btn_nav_overview, self.btn_nav_procs, self.btn_nav_log]
         for idx, btn in enumerate(buttons):
             btn.setProperty("active", "true" if idx == index else "false")
@@ -344,7 +381,6 @@ class ZeroOptimizeApp(QMainWindow):
                 self.activateWindow()
 
     def closeEvent(self, event):
-        # Silent minimize to tray with zero popups
         event.ignore()
         self.hide()
 
@@ -403,7 +439,6 @@ class ZeroOptimizeApp(QMainWindow):
         self._populate_mini_table()
 
     def _populate_mini_table(self):
-        # Top 8 consumers for overview page
         top_procs = sorted(self._cached_processes, key=lambda x: x["rss_mb"], reverse=True)[:8]
         self.mini_proc_table.setRowCount(len(top_procs))
         for row, p in enumerate(top_procs):
@@ -412,17 +447,6 @@ class ZeroOptimizeApp(QMainWindow):
             self.mini_proc_table.setItem(row, 1, QTableWidgetItem(p["name"]))
             self.mini_proc_table.setItem(row, 2, QTableWidgetItem(f"{p['rss_mb']:.1f} MB"))
             self.mini_proc_table.setItem(row, 3, QTableWidgetItem(f"{p['cpu_pct']:.1f}%"))
-
-            act_btn = QPushButton("Kill")
-            act_btn.setStyleSheet("""
-                QPushButton {
-                    background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2);
-                    color: #F87171; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 4px;
-                }
-                QPushButton:hover { background: rgba(239, 68, 68, 0.2); }
-            """)
-            act_btn.clicked.connect(lambda _, target_pid=pid: self._action_kill(target_pid))
-            self.mini_proc_table.setCellWidget(row, 4, act_btn)
 
     def _populate_table_filtered(self):
         search_query = self.search_input.text().lower().strip()
@@ -522,19 +546,10 @@ class ZeroOptimizeApp(QMainWindow):
     def _on_boost_done(self, res: dict):
         self.btn_quick_boost.setEnabled(True)
         self.btn_quick_boost.setText("⚡ Instant Reclaim")
-        daemons = res.get("daemons", {})
-        thumbs = res.get("thumbnails", {})
+        caches = res.get("caches", {})
         cpu = res.get("cpu_tuning", {})
         refs = res.get("cleared_refs", 0)
-        self._log(f"Reclaim Complete: Cleared {refs} memory pages, stopped {len(daemons.get('terminated_pids', []))} build daemons, balanced {cpu.get('reniced_count', 0)} background tasks.")
-        self._refresh_stats()
-        self._refresh_processes()
-
-    def _run_clean_workers(self):
-        w_res = self.cleaner.clean_stale_kioworkers()
-        d_res = self.cleaner.clean_idle_build_daemons()
-        freed = w_res.get("freed_mb", 0.0) + d_res.get("freed_mb", 0.0)
-        self._log(f"Cleaned stale workers & build daemons. Freed ~{round(freed, 1)} MB.")
+        self._log(f"Reclaim Complete: Cleared {refs} process memory pages, balanced {cpu.get('reniced_count', 0)} background tasks, freed {caches.get('freed_mb', 0)} MB cache.")
         self._refresh_stats()
         self._refresh_processes()
 
