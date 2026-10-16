@@ -214,10 +214,10 @@ class Cleaner:
         """Triggers zram and kernel memory compaction via helper if available."""
         self.sync_disks()
 
-        # 1. Check if passwordless sudo is functional
+        # 1. Check if passwordless sudo is functional for helper
         if self._can_sudo is None:
             try:
-                chk = subprocess.run(["sudo", "-n", "true"], capture_output=True, timeout=2)
+                chk = subprocess.run(["sudo", "-n", self.helper_path, "compact"], capture_output=True, timeout=3)
                 self._can_sudo = (chk.returncode == 0)
             except Exception:
                 self._can_sudo = False
